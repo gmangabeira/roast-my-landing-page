@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Flame } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import UploadBox from '@/components/UploadBox';
 import ContextForm from '@/components/ContextForm';
@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [pageGoal, setPageGoal] = useState('');
@@ -62,14 +63,17 @@ const Index = () => {
             brand_tone: brandTone,
             screenshot_url: screenshotUrl
           }
-        ]);
+        ])
+        .select();
       
       if (error) throw error;
       
-      toast({
-        title: "Coming soon!",
-        description: "This feature is not yet fully implemented. Check back later!",
-      });
+      if (data && data.length > 0) {
+        // Navigate to the results page with the roast ID
+        navigate('/roast-results', { state: { roastId: data[0].id } });
+      } else {
+        throw new Error('Failed to create roast record');
+      }
     } catch (error: any) {
       toast({
         title: "Error",
