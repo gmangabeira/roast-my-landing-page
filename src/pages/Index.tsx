@@ -6,9 +6,12 @@ import { useToast } from '@/components/ui/use-toast';
 import Header from '@/components/Header';
 import UploadBox from '@/components/UploadBox';
 import ContextForm from '@/components/ContextForm';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [pageGoal, setPageGoal] = useState('');
   const [audience, setAudience] = useState('');
@@ -20,7 +23,7 @@ const Index = () => {
     setFile(newFile);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!file && document.querySelector('input[type="url"]')?.getAttribute('value') === '') {
       toast({
         title: "Missing content",
@@ -32,14 +35,50 @@ const Index = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      let screenshotUrl = "";
+      
+      // If there's a file, upload it to Supabase Storage
+      if (file) {
+        // TODO: Implement file upload when storage bucket is created
+        // const { data, error } = await supabase.storage
+        //   .from('screenshots')
+        //   .upload(`${user?.id || 'guest'}-${Date.now()}`, file);
+        
+        // if (error) throw error;
+        // screenshotUrl = data.path;
+      }
+      
+      // Create a new roast record
+      const { data, error } = await supabase
+        .from('roasts')
+        .insert([
+          {
+            user_id: user?.id || null,
+            title: "Untitled Roast",
+            url: document.querySelector('input[type="url"]')?.getAttribute('value') || '',
+            page_goal: pageGoal,
+            audience,
+            brand_tone: brandTone,
+            screenshot_url: screenshotUrl
+          }
+        ]);
+      
+      if (error) throw error;
+      
       toast({
         title: "Coming soon!",
-        description: "This feature is not yet implemented. Check back later!",
+        description: "This feature is not yet fully implemented. Check back later!",
       });
-    }, 2000);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred while submitting your roast",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
