@@ -10,12 +10,13 @@ type AuthContextType = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{
     error: Error | null;
-    data: Session | null;
+    data: { session: Session | null; user: User | null } | null;
   }>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{
     error: Error | null;
-    data: Session | null;
+    data: { session: Session | null; user: User | null } | null;
   }>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -50,19 +51,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    return supabase.auth.signInWithPassword({ email, password });
+    try {
+      const response = await supabase.auth.signInWithPassword({ email, password });
+      return {
+        data: {
+          session: response.data.session,
+          user: response.data.user
+        },
+        error: response.error
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error : new Error('Unknown error during sign in')
+      };
+    }
   };
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
-    return supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
+    try {
+      const response = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
         },
-      },
+      });
+      return {
+        data: {
+          session: response.data.session,
+          user: response.data.user
+        },
+        error: response.error
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error : new Error('Unknown error during sign up')
+      };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/auth/callback'
+      }
     });
   };
 
@@ -77,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signIn,
     signUp,
+    signInWithGoogle,
     signOut,
   };
 
