@@ -32,45 +32,6 @@ const mockScores = {
   trustCredibility: 70
 };
 
-// Mock data for expert comments
-const mockComments = [
-  {
-    id: 1,
-    category: 'Clarity',
-    highlightArea: { x: 50, y: 120, width: 300, height: 80 },
-    issue: 'Headline is not immediately clear about the value proposition.',
-    solution: 'Rewrite headline to clearly state the primary benefit in 8 words or less.'
-  },
-  {
-    id: 2,
-    category: 'CTAs',
-    highlightArea: { x: 150, y: 320, width: 120, height: 40 },
-    issue: 'CTA button blends in with surrounding elements and lacks urgency.',
-    solution: 'Use contrasting color for CTA and add action-oriented text like "Start Free Trial Now".'
-  },
-  {
-    id: 3,
-    category: 'Design',
-    highlightArea: { x: 10, y: 200, width: 450, height: 100 },
-    issue: 'Too many visual elements competing for attention in this section.',
-    solution: 'Simplify to 3 key points with icons and remove the decorative elements.'
-  },
-  {
-    id: 4,
-    category: 'Trust',
-    highlightArea: { x: 100, y: 450, width: 250, height: 100 },
-    issue: 'Social proof is placed too far down the page to impact initial impressions.',
-    solution: 'Move testimonials or client logos higher, just below the main value proposition.'
-  },
-  {
-    id: 5,
-    category: 'Copy',
-    highlightArea: { x: 50, y: 250, width: 350, height: 60 },
-    issue: 'Feature description uses technical jargon that may confuse your audience.',
-    solution: 'Simplify language and focus on benefits rather than features.'
-  }
-];
-
 const RoastResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -78,6 +39,7 @@ const RoastResults = () => {
   const [roastData, setRoastData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchRoastData = async () => {
@@ -100,12 +62,15 @@ const RoastResults = () => {
 
         if (error) throw error;
 
-        // Enhance the data with our mock analysis data
+        // Generate roast comments using our edge function
+        const generatedComments = await generateRoastComments(data);
+
+        // Enhance the data with our analysis data
         setRoastData({
           ...data,
           heatmapData: mockHeatmapData,
           scores: mockScores,
-          comments: mockComments
+          comments: generatedComments
         });
       } catch (error: any) {
         toast({
@@ -120,6 +85,127 @@ const RoastResults = () => {
 
     fetchRoastData();
   }, [location.state, navigate, toast]);
+
+  // Function to generate roast comments using our edge function
+  const generateRoastComments = async (roastData: any) => {
+    try {
+      // Define the different sections to analyze
+      const sections = [
+        { type: 'Header', zone: 'Top navigation and branding', category: 'Design' },
+        { type: 'Hero', zone: 'Main headline and primary CTA', category: 'Copy' },
+        { type: 'Value Proposition', zone: 'Benefits and features section', category: 'Clarity' },
+        { type: 'Social Proof', zone: 'Testimonials and trust elements', category: 'Trust' },
+        { type: 'Call to Action', zone: 'Primary conversion buttons', category: 'CTAs' }
+      ];
+      
+      const generatedComments = [];
+      
+      // Generate feedback for each section
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        
+        // Mock coordinates for highlighting
+        const highlightArea = {
+          x: 50 + (i * 30),
+          y: 100 + (i * 50),
+          width: 200 + (i * 10),
+          height: 80
+        };
+        
+        // Generate a score between 40-90 for variety
+        const score = Math.floor(Math.random() * 50) + 40;
+        
+        // Call our edge function to generate the roast feedback
+        const response = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-roast', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            section: section.type,
+            score: score,
+            context: roastData.page_goal || 'Increase conversions',
+            zone: section.zone
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to generate roast for ${section.type}`);
+        }
+        
+        const result = await response.json();
+        
+        // Extract "What's wrong" and "Fix it fast" parts from the response
+        const contentLines = result.result.split('\n');
+        let issue = '';
+        let solution = '';
+        
+        for (const line of contentLines) {
+          if (line.includes('❌ What\'s wrong:')) {
+            issue = line.replace('❌ What\'s wrong:', '').trim();
+          } else if (line.includes('✅ Fix it fast:')) {
+            solution = line.replace('✅ Fix it fast:', '').trim();
+          }
+        }
+        
+        // If the format isn't as expected, use the whole response
+        if (!issue && !solution) {
+          issue = "Issue with section";
+          solution = result.result;
+        }
+        
+        generatedComments.push({
+          id: i + 1,
+          category: section.category,
+          highlightArea: highlightArea,
+          issue: issue,
+          solution: solution
+        });
+      }
+      
+      return generatedComments;
+    } catch (error) {
+      console.error('Error generating roast comments:', error);
+      // Fall back to mock comments
+      return [
+        {
+          id: 1,
+          category: 'Clarity',
+          highlightArea: { x: 50, y: 120, width: 300, height: 80 },
+          issue: 'Headline is not immediately clear about the value proposition.',
+          solution: 'Rewrite headline to clearly state the primary benefit in 8 words or less.'
+        },
+        {
+          id: 2,
+          category: 'CTAs',
+          highlightArea: { x: 150, y: 320, width: 120, height: 40 },
+          issue: 'CTA button blends in with surrounding elements and lacks urgency.',
+          solution: 'Use contrasting color for CTA and add action-oriented text like "Start Free Trial Now".'
+        },
+        {
+          id: 3,
+          category: 'Design',
+          highlightArea: { x: 10, y: 200, width: 450, height: 100 },
+          issue: 'Too many visual elements competing for attention in this section.',
+          solution: 'Simplify to 3 key points with icons and remove the decorative elements.'
+        },
+        {
+          id: 4,
+          category: 'Trust',
+          highlightArea: { x: 100, y: 450, width: 250, height: 100 },
+          issue: 'Social proof is placed too far down the page to impact initial impressions.',
+          solution: 'Move testimonials or client logos higher, just below the main value proposition.'
+        },
+        {
+          id: 5,
+          category: 'Copy',
+          highlightArea: { x: 50, y: 250, width: 350, height: 60 },
+          issue: 'Feature description uses technical jargon that may confuse your audience.',
+          solution: 'Simplify language and focus on benefits rather than features.'
+        }
+      ];
+    }
+  };
 
   const goBack = () => {
     navigate('/');
@@ -173,11 +259,11 @@ const RoastResults = () => {
           </Button>
           
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            {roastData.title || "Untitled"} 
+            {roastData?.title || "Untitled"} 
             <span className="text-brand-green bg-brand-green/10 p-1 rounded text-sm">Roast</span>
           </h1>
           
-          {roastData.url && (
+          {roastData?.url && (
             <a 
               href={roastData.url} 
               target="_blank" 
@@ -192,17 +278,17 @@ const RoastResults = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Panel: Screenshot + Heatmap Toggle */}
           <ScreenshotPanel 
-            screenshot={roastData.screenshot_url} 
-            heatmapData={roastData.heatmapData} 
+            screenshot={roastData?.screenshot_url} 
+            heatmapData={roastData?.heatmapData} 
             showHeatmap={showHeatmap}
             setShowHeatmap={setShowHeatmap}
           />
           
           {/* Center Panel: CRO Scorecard */}
-          <ScorePanel scores={roastData.scores} />
+          <ScorePanel scores={roastData?.scores} />
           
           {/* Right Panel: Expert Roast Comments */}
-          <CommentsPanel comments={roastData.comments} />
+          <CommentsPanel comments={roastData?.comments} />
         </div>
       </main>
       
