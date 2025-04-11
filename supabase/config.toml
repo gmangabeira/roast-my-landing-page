@@ -3,3 +3,6 @@ project_id = "wtrnzafcmmwxizdkfkdu"
 
 [functions.generate-roast]
 verify_jwt = false
+
+[functions.generate-screenshot]
+verify_jwt = false
