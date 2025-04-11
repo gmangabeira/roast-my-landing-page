@@ -1,1 +1,5 @@
+
 project_id = "wtrnzafcmmwxizdkfkdu"
+
+[functions.generate-roast]
+verify_jwt = false
