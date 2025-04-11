@@ -1,24 +1,74 @@
 
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Flame, ArrowLeft, Eye, MessageSquare, Zap } from 'lucide-react';
+import { ArrowLeft, EyeOff, Eye, MessageSquare, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Header from '@/components/Header';
-import { ChartContainer } from '@/components/ui/chart';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ScreenshotPanel from '@/components/roast/ScreenshotPanel';
+import ScorePanel from '@/components/roast/ScorePanel';
+import CommentsPanel from '@/components/roast/CommentsPanel';
 
-// Mock data for the heatmap analysis
-const mockAttentionData = [
-  { name: 'Header', value: 75 },
-  { name: 'Hero Section', value: 90 },
-  { name: 'Features', value: 45 },
-  { name: 'Testimonials', value: 30 },
-  { name: 'CTA', value: 60 },
-  { name: 'Footer', value: 15 },
+// Mock data for heatmap areas
+const mockHeatmapData = [
+  { x: 10, y: 10, width: 200, height: 100, intensity: 0.9 }, // Header - Red (high intensity)
+  { x: 50, y: 120, width: 300, height: 200, intensity: 0.5 }, // Hero - Yellow (medium intensity)
+  { x: 100, y: 350, width: 250, height: 150, intensity: 0.2 }, // Benefits - Blue (low intensity)
+];
+
+// Mock data for CRO scores
+const mockScores = {
+  overall: 68,
+  visualHierarchy: 75,
+  valueProposition: 60,
+  ctaStrength: 85,
+  copyResonance: 55,
+  trustCredibility: 70
+};
+
+// Mock data for expert comments
+const mockComments = [
+  {
+    id: 1,
+    category: 'Clarity',
+    highlightArea: { x: 50, y: 120, width: 300, height: 80 },
+    issue: 'Headline is not immediately clear about the value proposition.',
+    solution: 'Rewrite headline to clearly state the primary benefit in 8 words or less.'
+  },
+  {
+    id: 2,
+    category: 'CTAs',
+    highlightArea: { x: 150, y: 320, width: 120, height: 40 },
+    issue: 'CTA button blends in with surrounding elements and lacks urgency.',
+    solution: 'Use contrasting color for CTA and add action-oriented text like "Start Free Trial Now".'
+  },
+  {
+    id: 3,
+    category: 'Design',
+    highlightArea: { x: 10, y: 200, width: 450, height: 100 },
+    issue: 'Too many visual elements competing for attention in this section.',
+    solution: 'Simplify to 3 key points with icons and remove the decorative elements.'
+  },
+  {
+    id: 4,
+    category: 'Trust',
+    highlightArea: { x: 100, y: 450, width: 250, height: 100 },
+    issue: 'Social proof is placed too far down the page to impact initial impressions.',
+    solution: 'Move testimonials or client logos higher, just below the main value proposition.'
+  },
+  {
+    id: 5,
+    category: 'Copy',
+    highlightArea: { x: 50, y: 250, width: 350, height: 60 },
+    issue: 'Feature description uses technical jargon that may confuse your audience.',
+    solution: 'Simplify language and focus on benefits rather than features.'
+  }
 ];
 
 const RoastResults = () => {
@@ -27,6 +77,7 @@ const RoastResults = () => {
   const { toast } = useToast();
   const [roastData, setRoastData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   useEffect(() => {
     const fetchRoastData = async () => {
@@ -49,22 +100,12 @@ const RoastResults = () => {
 
         if (error) throw error;
 
+        // Enhance the data with our mock analysis data
         setRoastData({
           ...data,
-          // Add mock analysis data since we don't have a real AI analysis yet
-          heatmapData: mockAttentionData,
-          copyFeedback: {
-            headline: "Your headline is clear but could be more compelling",
-            value_proposition: "Your value proposition isn't immediately clear",
-            cta: "Your call-to-action button text is effective",
-          },
-          conversionTips: [
-            "Add social proof near your main call-to-action",
-            "Reduce form fields to minimize friction",
-            "Clarify the immediate benefit in your headline",
-            "Add urgency element like limited time offer",
-            "Make your primary CTA more visually distinct"
-          ]
+          heatmapData: mockHeatmapData,
+          scores: mockScores,
+          comments: mockComments
         });
       } catch (error: any) {
         toast({
@@ -88,10 +129,10 @@ const RoastResults = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1 container max-w-5xl mx-auto px-4 py-8 flex items-center justify-center">
+        <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin mb-4">
-              <Flame size={32} className="text-brand-green" />
+              <Zap size={32} className="text-brand-green" />
             </div>
             <h2 className="text-xl font-semibold">Analyzing your landing page...</h2>
             <p className="text-gray-500 mt-2">This may take a moment</p>
@@ -105,7 +146,7 @@ const RoastResults = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1 container max-w-5xl mx-auto px-4 py-8 flex items-center justify-center">
+        <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-semibold">Roast not found</h2>
             <p className="text-gray-500 mt-2">We couldn't find the requested roast analysis</p>
@@ -120,7 +161,7 @@ const RoastResults = () => {
     <div className="min-h-screen flex flex-col">
       <Header />
       
-      <main className="flex-1 container max-w-5xl mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-6">
           <Button 
             variant="ghost" 
@@ -131,8 +172,9 @@ const RoastResults = () => {
             Back to Home
           </Button>
           
-          <h1 className="text-3xl font-bold">
-            {roastData.title} <span className="text-brand-green">Roast</span>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            {roastData.title || "Untitled"} 
+            <span className="text-brand-green bg-brand-green/10 p-1 rounded text-sm">Roast</span>
           </h1>
           
           {roastData.url && (
@@ -147,185 +189,25 @@ const RoastResults = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="heatmap">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="heatmap" className="gap-2">
-                  <Eye size={16} /> Predictive Heatmap
-                </TabsTrigger>
-                <TabsTrigger value="copy" className="gap-2">
-                  <MessageSquare size={16} /> Copy Analysis
-                </TabsTrigger>
-                <TabsTrigger value="conversion" className="gap-2">
-                  <Zap size={16} /> Conversion Tips
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="heatmap" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Attention Distribution</CardTitle>
-                    <CardDescription>
-                      See where visitors look first and what they might ignore
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={roastData.heatmapData}
-                          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                          <XAxis dataKey="name" />
-                          <YAxis label={{ value: 'Attention Score', angle: -90, position: 'insideLeft' }} />
-                          <Tooltip />
-                          <Area 
-                            type="monotone" 
-                            dataKey="value" 
-                            stroke="#22C55E" 
-                            fill="#22C55E" 
-                            fillOpacity={0.3} 
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t">
-                      <h4 className="font-medium mb-2">Key Insights:</h4>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-start gap-2">
-                          <span className="bg-green-100 text-green-800 p-1 rounded-full flex-shrink-0">
-                            <Flame size={12} />
-                          </span>
-                          <span>Your hero section captures strong initial attention</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="bg-amber-100 text-amber-800 p-1 rounded-full flex-shrink-0">
-                            <Flame size={12} />
-                          </span>
-                          <span>Testimonials section isn't getting enough visibility</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="bg-red-100 text-red-800 p-1 rounded-full flex-shrink-0">
-                            <Flame size={12} />
-                          </span>
-                          <span>Features section attention drops significantly</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="copy" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Copy Analysis</CardTitle>
-                    <CardDescription>
-                      Feedback on your messaging clarity and persuasiveness
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <h4 className="font-medium">Headline</h4>
-                        <div className="p-4 bg-gray-50 rounded-lg border text-sm">
-                          {roastData.copyFeedback.headline}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h4 className="font-medium">Value Proposition</h4>
-                        <div className="p-4 bg-gray-50 rounded-lg border text-sm">
-                          {roastData.copyFeedback.value_proposition}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h4 className="font-medium">Call to Action</h4>
-                        <div className="p-4 bg-gray-50 rounded-lg border text-sm">
-                          {roastData.copyFeedback.cta}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="conversion" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Conversion Tips</CardTitle>
-                    <CardDescription>
-                      Specific improvements to boost click-through and conversion rates
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-4">
-                      {roastData.conversionTips.map((tip: string, index: number) => (
-                        <li key={index} className="flex gap-3 items-start">
-                          <div className="bg-brand-green/10 text-brand-green p-2 rounded-full flex-shrink-0">
-                            <Zap size={16} />
-                          </div>
-                          <div>
-                            <p className="text-gray-800">{tip}</p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left Panel: Screenshot + Heatmap Toggle */}
+          <ScreenshotPanel 
+            screenshot={roastData.screenshot_url} 
+            heatmapData={roastData.heatmapData} 
+            showHeatmap={showHeatmap}
+            setShowHeatmap={setShowHeatmap}
+          />
           
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Landing Page</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border overflow-hidden bg-gray-50 flex items-center justify-center">
-                  {roastData.screenshot_url ? (
-                    <img 
-                      src={roastData.screenshot_url} 
-                      alt="Landing page screenshot" 
-                      className="w-full h-auto"
-                    />
-                  ) : (
-                    <div className="text-center p-8 text-gray-400">
-                      <Eye size={32} className="mx-auto mb-2 opacity-20" />
-                      <p className="text-sm">Screenshot will appear here</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Page Goal</h4>
-                    <p className="text-sm text-gray-600">{roastData.page_goal || "Not specified"}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Target Audience</h4>
-                    <p className="text-sm text-gray-600">{roastData.audience || "Not specified"}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Brand Voice & Tone</h4>
-                    <p className="text-sm text-gray-600">{roastData.brand_tone || "Not specified"}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Center Panel: CRO Scorecard */}
+          <ScorePanel scores={roastData.scores} />
+          
+          {/* Right Panel: Expert Roast Comments */}
+          <CommentsPanel comments={roastData.comments} />
         </div>
       </main>
       
       <footer className="py-6 border-t">
-        <div className="container max-w-5xl mx-auto px-4 text-center text-sm text-gray-500">
+        <div className="container mx-auto px-4 text-center text-sm text-gray-500">
           <p>© 2025 Conversion ROAST. All rights reserved.</p>
         </div>
       </footer>
