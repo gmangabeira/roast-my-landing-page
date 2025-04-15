@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface HeatmapArea {
   x: number;
@@ -27,10 +28,18 @@ const ScreenshotPanel = ({
   showHeatmap, 
   setShowHeatmap 
 }: ScreenshotPanelProps) => {
+  const { toast } = useToast();
   const [isGeneratingHeatmap, setIsGeneratingHeatmap] = useState(false);
   const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
   const [heatmapError, setHeatmapError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'screenshot' | 'heatmap' | 'overlay'>('screenshot');
+
+  useEffect(() => {
+    // Clear the heatmap error on new screenshot
+    if (screenshot) {
+      setHeatmapError(null);
+    }
+  }, [screenshot]);
 
   useEffect(() => {
     // Set view mode based on showHeatmap prop (for backward compatibility)
@@ -48,6 +57,13 @@ const ScreenshotPanel = ({
     setHeatmapError(null);
     
     try {
+      toast({
+        title: "Generating heatmap",
+        description: "This may take up to 30 seconds...",
+      });
+      
+      console.log(`Generating heatmap for image: ${screenshot}`);
+      
       const response = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-heatmap', {
         method: 'POST',
         headers: {
@@ -60,11 +76,18 @@ const ScreenshotPanel = ({
       
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Heatmap generation error:', errorData);
         throw new Error(errorData.details || 'Failed to generate heatmap');
       }
       
       const result = await response.json();
+      console.log('Heatmap generation successful:', result);
       setHeatmapUrl(result.heatmap_url);
+      
+      toast({
+        title: "Heatmap ready!",
+        description: "Your AI-generated attention heatmap is now available.",
+      });
       
       // Auto-switch to overlay view when heatmap is ready
       setViewMode('overlay');
@@ -72,6 +95,12 @@ const ScreenshotPanel = ({
     } catch (error) {
       console.error('Error generating heatmap:', error);
       setHeatmapError(error.message || 'Failed to generate heatmap');
+      
+      toast({
+        title: "Heatmap generation failed",
+        description: error.message || "An error occurred while generating the heatmap.",
+        variant: "destructive",
+      });
     } finally {
       setIsGeneratingHeatmap(false);
     }
