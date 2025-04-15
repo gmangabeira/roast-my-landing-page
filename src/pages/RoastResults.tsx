@@ -23,6 +23,11 @@ const RoastResults = () => {
     const fetchRoastData = async () => {
       try {
         if (!location.state?.roastId) {
+          toast({
+            title: "Missing roast ID",
+            description: "No roast ID was provided",
+            variant: "destructive",
+          });
           navigate('/');
           return;
         }
@@ -37,6 +42,10 @@ const RoastResults = () => {
 
         if (!roast) {
           throw new Error('Roast not found');
+        }
+
+        if (!roast.screenshot_url) {
+          throw new Error('Screenshot not available');
         }
 
         // Generate roast comments using our edge function
@@ -61,7 +70,15 @@ const RoastResults = () => {
 
         setRoastData({
           ...roast,
-          comments: commentsData.comments || []
+          comments: commentsData.comments || [],
+          scores: commentsData.scores || {
+            overall: 0,
+            visualHierarchy: 0,
+            valueProposition: 0,
+            ctaStrength: 0,
+            copyResonance: 0,
+            trustCredibility: 0
+          }
         });
 
       } catch (error: any) {
