@@ -39,15 +39,43 @@ const Index = () => {
     try {
       let screenshotUrl = "";
       
-      // If there's a file, upload it to Supabase Storage
-      if (file) {
-        // TODO: Implement file upload when storage bucket is created
-        // const { data, error } = await supabase.storage
-        //   .from('screenshots')
-        //   .upload(`${user?.id || 'guest'}-${Date.now()}`, file);
+      // If there's a URL entered, generate a screenshot
+      if (!file) {
+        const url = document.querySelector('input[type="url"]')?.getAttribute('value');
+        if (url) {
+          const screenshotResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-screenshot', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url })
+          });
+          
+          if (!screenshotResponse.ok) {
+            throw new Error('Failed to generate screenshot');
+          }
+          
+          const screenshotData = await screenshotResponse.json();
+          screenshotUrl = screenshotData.screenshot_url;
+        }
+      } else {
+        // Upload the file to Supabase Storage
+        const timestamp = Date.now();
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${user?.id || 'guest'}/${timestamp}.${fileExt}`;
         
-        // if (error) throw error;
-        // screenshotUrl = data.path;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(filePath, file);
+          
+        if (uploadError) throw uploadError;
+        
+        // Get the public URL for the uploaded file
+        const { data: { publicUrl } } = supabase.storage
+          .from('screenshots')
+          .getPublicUrl(filePath);
+          
+        screenshotUrl = publicUrl;
       }
       
       // Create a new roast record
@@ -56,7 +84,7 @@ const Index = () => {
         .insert([
           {
             user_id: user?.id || null,
-            title: "Untitled Roast",
+            title: "Landing Page Roast",
             url: document.querySelector('input[type="url"]')?.getAttribute('value') || '',
             page_goal: pageGoal,
             audience,
@@ -75,6 +103,7 @@ const Index = () => {
         throw new Error('Failed to create roast record');
       }
     } catch (error: any) {
+      console.error('Error:', error);
       toast({
         title: "Error",
         description: error.message || "An error occurred while submitting your roast",
