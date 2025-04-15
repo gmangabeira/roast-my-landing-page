@@ -18,6 +18,7 @@ const RoastResults = () => {
   const [roastData, setRoastData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     const fetchRoastData = async () => {
@@ -48,7 +49,9 @@ const RoastResults = () => {
           throw new Error('Screenshot not available');
         }
 
-        // Generate roast comments using our edge function
+        setIsGenerating(true);
+        
+        // Generate roast comments using our GPT-4 Vision edge function
         const commentsResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-roast', {
           method: 'POST',
           headers: {
@@ -57,8 +60,8 @@ const RoastResults = () => {
           body: JSON.stringify({
             screenshot_url: roast.screenshot_url,
             page_goal: roast.page_goal || 'Increase conversions',
-            audience: roast.audience,
-            brand_tone: roast.brand_tone
+            audience: roast.audience || 'General audience',
+            brand_tone: roast.brand_tone || 'Professional'
           })
         });
 
@@ -67,6 +70,10 @@ const RoastResults = () => {
         }
 
         const commentsData = await commentsResponse.json();
+        
+        if (commentsData.error) {
+          throw new Error(commentsData.error);
+        }
 
         setRoastData({
           ...roast,
@@ -81,6 +88,12 @@ const RoastResults = () => {
           }
         });
 
+        toast({
+          title: "Roast generated",
+          description: "Your landing page roast has been successfully analyzed by our AI",
+          variant: "default",
+        });
+
       } catch (error: any) {
         console.error('Error loading roast:', error);
         toast({
@@ -91,6 +104,7 @@ const RoastResults = () => {
         navigate('/');
       } finally {
         setIsLoading(false);
+        setIsGenerating(false);
       }
     };
 
