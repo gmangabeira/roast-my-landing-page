@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.generate-screenshot]
 verify_jwt = false
+
+[functions.generate-heatmap]
+verify_jwt = false
