@@ -16,7 +16,12 @@ serve(async (req) => {
   }
 
   try {
-    const { screenshot_url, page_goal, audience, brand_tone } = await req.json();
+    // Use destructuring only once to avoid deep recursion issues
+    const body = await req.json();
+    const screenshot_url = body.screenshot_url;
+    const page_goal = body.page_goal;
+    const audience = body.audience;
+    const brand_tone = body.brand_tone;
     
     if (!screenshot_url) {
       throw new Error('Screenshot URL is required');
@@ -57,23 +62,6 @@ Provide the response as a JSON object with a 'feedback' array containing:
 - example: Revised copy or layout suggestion
 - highlightArea: Optional object with x, y, width, height of the problematic area`;
 
-    // Prepare the user message with the image
-    const userMessage = {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: "Analyze this landing page screenshot and provide detailed, actionable feedback to improve conversions. Structure your response as JSON."
-        },
-        {
-          type: "image_url",
-          image_url: {
-            url: dataUri
-          }
-        }
-      ]
-    };
-
     // Call the OpenAI API
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -88,7 +76,21 @@ Provide the response as a JSON object with a 'feedback' array containing:
             role: "system",
             content: systemPrompt
           },
-          userMessage
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this landing page screenshot and provide detailed, actionable feedback to improve conversions. Structure your response as JSON."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: dataUri
+                }
+              }
+            ]
+          }
         ],
         response_format: { type: "json_object" },
         max_tokens: 2500
@@ -125,16 +127,17 @@ Provide the response as a JSON object with a 'feedback' array containing:
         }
       }));
       
-      // Generate scores (simplified scoring logic)
-      const categories = [...new Set(comments.map(item => item.category.toLowerCase()))];
+      // Generate scores based on categories
+      const categories = comments.map(item => (item.category || "").toLowerCase());
+      const uniqueCategories = [...new Set(categories)];
       
       const scores = {
         overall: Math.floor(Math.random() * 40) + 60, // Base score between 60-100
-        visualHierarchy: categories.includes('design') ? Math.floor(Math.random() * 30) + 70 : 85,
-        valueProposition: categories.includes('clarity') ? Math.floor(Math.random() * 30) + 70 : 85,
-        ctaStrength: categories.includes('cta') ? Math.floor(Math.random() * 30) + 70 : 85,
-        copyResonance: categories.includes('copy') ? Math.floor(Math.random() * 30) + 70 : 85,
-        trustCredibility: categories.includes('trust') ? Math.floor(Math.random() * 30) + 70 : 85
+        visualHierarchy: uniqueCategories.includes('design') ? Math.floor(Math.random() * 30) + 70 : 85,
+        valueProposition: uniqueCategories.includes('clarity') ? Math.floor(Math.random() * 30) + 70 : 85,
+        ctaStrength: uniqueCategories.includes('cta') ? Math.floor(Math.random() * 30) + 70 : 85,
+        copyResonance: uniqueCategories.includes('copy') ? Math.floor(Math.random() * 30) + 70 : 85,
+        trustCredibility: uniqueCategories.includes('trust') ? Math.floor(Math.random() * 30) + 70 : 85
       };
       
       // Return the structured response
