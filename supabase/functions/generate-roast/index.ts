@@ -6,6 +6,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -16,26 +17,28 @@ serve(async (req) => {
   }
 
   try {
-    // Use destructuring only once to avoid deep recursion issues
+    // Parse request body
     const body = await req.json();
-    const screenshot_url = body.screenshot_url;
-    const page_goal = body.page_goal;
-    const audience = body.audience;
-    const brand_tone = body.brand_tone;
     
-    if (!screenshot_url) {
-      throw new Error('Screenshot URL is required');
+    // Extract fields with fallbacks for backward compatibility
+    const imageUrl = body.image_url || body.screenshot_url;
+    const context = body.context || body.page_goal || "Landing page";
+    const goal = body.goal || "Increase conversions";
+    const tone = body.tone || body.brand_tone || "Professional";
+    
+    if (!imageUrl) {
+      throw new Error('Image URL is required');
     }
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key is not configured');
     }
 
-    console.log(`Analyzing screenshot: ${screenshot_url}`);
-    console.log(`Page goal: ${page_goal}, Audience: ${audience}, Brand tone: ${brand_tone}`);
+    console.log(`Analyzing image: ${imageUrl}`);
+    console.log(`Context: ${context}, Goal: ${goal}, Tone: ${tone}`);
     
     // Fetch the image data
-    const imageResponse = await fetch(screenshot_url);
+    const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
     }
@@ -46,21 +49,24 @@ serve(async (req) => {
     const dataUri = `data:${imageResponse.headers.get('content-type') || 'image/png'};base64,${base64Image}`;
     
     // Prepare the system prompt
-    const systemPrompt = `You are a Conversion Rate Optimization expert. Analyze this landing page screenshot for ${page_goal || 'improved conversions'}.
-The target audience is ${audience || 'general consumers'} and the brand tone is ${brand_tone || 'professional'}.
+    const systemPrompt = `You are a senior CRO expert. Analyze this landing page screenshot.
 
-For each major section (hero/header, mid-page, CTA, footer, etc), identify:
-• ❌ What's wrong: Describe clarity, copy, CTA, design, or trust issues
-• ✅ Fix it fast: Suggest an actionable improvement
-• ✍️ Example: Provide a revised version of copy or layout that addresses the issue.
+For each section (Hero, Mid Page, CTA, Footer), identify:
+❌ What's wrong — UX, copy, clarity, or trust issues
+✅ Fix it fast — a short and actionable suggestion
+✍️ Example fix — rewrite or redesign suggestion in 1–2 lines
 
-Provide the response as a JSON object with a 'feedback' array containing:
-- section: Name of the page section
-- category: Issue type (Clarity, Copy, CTA, Trust, Design)
-- issue: Specific problem description
-- solution: Actionable improvement suggestion
-- example: Revised copy or layout suggestion
-- highlightArea: Optional object with x, y, width, height of the problematic area`;
+Context: ${context}
+Goal: ${goal}
+Tone: ${tone}
+
+Return a JSON array of objects with these fields:
+- section: Name of the page section (Hero, Mid Page, CTA, Footer, etc.)
+- label: Issue type (Clarity, Copy, CTA, Trust, Design)
+- issue: Description of the problem
+- suggestion: Clear, actionable improvement
+- example_text: Example of better copy or design
+- highlight_area: (Optional) Approximate coordinates of the issue (x, y, width, height)`;
 
     // Call the OpenAI API
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -81,7 +87,7 @@ Provide the response as a JSON object with a 'feedback' array containing:
             content: [
               {
                 type: "text",
-                text: "Analyze this landing page screenshot and provide detailed, actionable feedback to improve conversions. Structure your response as JSON."
+                text: "Analyze this landing page screenshot and provide detailed, actionable feedback for improvement. Structure your response as a JSON array."
               },
               {
                 type: "image_url",
@@ -104,22 +110,52 @@ Provide the response as a JSON object with a 'feedback' array containing:
     }
 
     const openAIData = await openAIResponse.json();
-    console.log("Raw GPT-4o response received");
+    console.log("GPT-4o response received");
     
     // Extract and parse the response
     try {
       const rawResponse = openAIData.choices[0].message.content;
-      const parsedResponse = JSON.parse(rawResponse);
+      console.log("Raw response:", rawResponse.substring(0, 200) + "...");
       
-      // Process the parsed response
-      const comments = parsedResponse.feedback.map((item, index) => ({
+      // Handle different response formats
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(rawResponse);
+      } catch (parseError) {
+        console.error("Error parsing JSON response:", parseError);
+        throw new Error("Failed to parse OpenAI response as valid JSON");
+      }
+      
+      // Process the parsed response - handle both array and object formats
+      let comments = [];
+      
+      if (Array.isArray(parsedResponse)) {
+        // Direct array format
+        comments = parsedResponse;
+      } else if (parsedResponse.feedback && Array.isArray(parsedResponse.feedback)) {
+        // Object with feedback array
+        comments = parsedResponse.feedback;
+      } else {
+        // Try to find any array property
+        const arrayProps = Object.keys(parsedResponse).filter(key => 
+          Array.isArray(parsedResponse[key]) && parsedResponse[key].length > 0);
+          
+        if (arrayProps.length > 0) {
+          comments = parsedResponse[arrayProps[0]];
+        } else {
+          throw new Error("Could not find valid feedback array in API response");
+        }
+      }
+      
+      // Standardize the comment format
+      const standardizedComments = comments.map((item, index) => ({
         id: index + 1,
-        category: item.category || "General",
         section: item.section || "Page",
+        category: item.label || item.category || "General",
         issue: item.issue || "",
-        solution: item.solution || "",
-        example: item.example || "",
-        highlightArea: item.highlightArea || {
+        solution: item.suggestion || item.solution || "",
+        example: item.example_text || item.example || "",
+        highlightArea: item.highlight_area || item.highlightArea || {
           x: 0,
           y: 0,
           width: 0,
@@ -128,7 +164,7 @@ Provide the response as a JSON object with a 'feedback' array containing:
       }));
       
       // Generate scores based on categories
-      const categories = comments.map(item => (item.category || "").toLowerCase());
+      const categories = standardizedComments.map(item => (item.category || "").toLowerCase());
       const uniqueCategories = [...new Set(categories)];
       
       const scores = {
@@ -143,15 +179,15 @@ Provide the response as a JSON object with a 'feedback' array containing:
       // Return the structured response
       return new Response(
         JSON.stringify({
-          comments,
+          comments: standardizedComments,
           scores,
-          rawAnalysis: rawResponse // Include raw analysis for debugging
+          rawAnalysis: rawResponse.substring(0, 500) // Include truncated raw analysis for debugging
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      throw new Error(`Failed to parse OpenAI response: ${parseError.message}`);
+      console.error('Error processing OpenAI response:', parseError);
+      throw new Error(`Failed to process OpenAI response: ${parseError.message}`);
     }
     
   } catch (error) {
