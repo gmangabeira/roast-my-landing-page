@@ -44,7 +44,7 @@ const Index = () => {
       if (file) {
         const timestamp = Date.now();
         const fileExt = file.name.split('.').pop();
-        const filePath = `${user?.id || 'guest'}/${timestamp}.${fileExt}`;
+        const filePath = `${user?.id || 'anonymous'}/${timestamp}.${fileExt}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('screenshots')

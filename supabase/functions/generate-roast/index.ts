@@ -22,6 +22,10 @@ serve(async (req) => {
       throw new Error('Screenshot URL is required');
     }
 
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key is not configured');
+    }
+
     console.log(`Analyzing screenshot: ${screenshot_url}`);
     console.log(`Page goal: ${page_goal}, Audience: ${audience}, Brand tone: ${brand_tone}`);
     
@@ -101,44 +105,51 @@ Provide the response as a JSON object with a 'feedback' array containing:
     console.log("Raw GPT-4o response received");
     
     // Extract and parse the response
-    const rawResponse = openAIData.choices[0].message.content;
-    const parsedResponse = JSON.parse(rawResponse);
-    
-    // Process the parsed response
-    const comments = parsedResponse.feedback.map((item, index) => ({
-      id: index + 1,
-      category: item.category || "General",
-      section: item.section || "Page",
-      issue: item.issue || "",
-      solution: item.solution || "",
-      example: item.example || "",
-      highlightArea: item.highlightArea || {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0
-      }
-    }));
-    
-    // Generate scores (simplified scoring logic)
-    const scores = {
-      overall: Math.floor(Math.random() * 40) + 60, // Base score between 60-100
-      visualHierarchy: Math.floor(Math.random() * 30) + 70,
-      valueProposition: Math.floor(Math.random() * 30) + 70,
-      ctaStrength: Math.floor(Math.random() * 30) + 70,
-      copyResonance: Math.floor(Math.random() * 30) + 70,
-      trustCredibility: Math.floor(Math.random() * 30) + 70
-    };
-    
-    // Return the structured response
-    return new Response(
-      JSON.stringify({
-        comments,
-        scores,
-        rawAnalysis: rawResponse // Include raw analysis for debugging
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    try {
+      const rawResponse = openAIData.choices[0].message.content;
+      const parsedResponse = JSON.parse(rawResponse);
+      
+      // Process the parsed response
+      const comments = parsedResponse.feedback.map((item, index) => ({
+        id: index + 1,
+        category: item.category || "General",
+        section: item.section || "Page",
+        issue: item.issue || "",
+        solution: item.solution || "",
+        example: item.example || "",
+        highlightArea: item.highlightArea || {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0
+        }
+      }));
+      
+      // Generate scores (simplified scoring logic)
+      const categories = [...new Set(comments.map(item => item.category.toLowerCase()))];
+      
+      const scores = {
+        overall: Math.floor(Math.random() * 40) + 60, // Base score between 60-100
+        visualHierarchy: categories.includes('design') ? Math.floor(Math.random() * 30) + 70 : 85,
+        valueProposition: categories.includes('clarity') ? Math.floor(Math.random() * 30) + 70 : 85,
+        ctaStrength: categories.includes('cta') ? Math.floor(Math.random() * 30) + 70 : 85,
+        copyResonance: categories.includes('copy') ? Math.floor(Math.random() * 30) + 70 : 85,
+        trustCredibility: categories.includes('trust') ? Math.floor(Math.random() * 30) + 70 : 85
+      };
+      
+      // Return the structured response
+      return new Response(
+        JSON.stringify({
+          comments,
+          scores,
+          rawAnalysis: rawResponse // Include raw analysis for debugging
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      throw new Error(`Failed to parse OpenAI response: ${parseError.message}`);
+    }
     
   } catch (error) {
     console.error('Error in generate-roast function:', error);
