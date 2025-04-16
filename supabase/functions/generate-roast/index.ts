@@ -17,14 +17,14 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body
+    // Parse request body - do this only once
     const body = await req.json();
     
-    // Extract fields with fallbacks for backward compatibility
-    const imageUrl = body.image_url || body.screenshot_url;
-    const context = body.context || body.page_goal || "Landing page";
+    // Extract required fields
+    const imageUrl = body.image_url;
     const goal = body.goal || "Increase conversions";
-    const tone = body.tone || body.brand_tone || "Professional";
+    const audience = body.audience || "General audience";
+    const tone = body.tone || "Professional";
     
     if (!imageUrl) {
       throw new Error('Image URL is required');
@@ -35,7 +35,7 @@ serve(async (req) => {
     }
 
     console.log(`Analyzing image: ${imageUrl}`);
-    console.log(`Context: ${context}, Goal: ${goal}, Tone: ${tone}`);
+    console.log(`Goal: ${goal}, Audience: ${audience}, Tone: ${tone}`);
     
     // Fetch the image data
     const imageResponse = await fetch(imageUrl);
@@ -49,24 +49,40 @@ serve(async (req) => {
     const dataUri = `data:${imageResponse.headers.get('content-type') || 'image/png'};base64,${base64Image}`;
     
     // Prepare the system prompt
-    const systemPrompt = `You are a senior CRO expert. Analyze this landing page screenshot.
+    const systemPrompt = `You are a senior CRO expert.
 
-For each section (Hero, Mid Page, CTA, Footer), identify:
-❌ What's wrong — UX, copy, clarity, or trust issues
-✅ Fix it fast — a short and actionable suggestion
-✍️ Example fix — rewrite or redesign suggestion in 1–2 lines
+Analyze the landing page image below for:
 
-Context: ${context}
-Goal: ${goal}
-Tone: ${tone}
+- Clarity
+- Visual Hierarchy
+- CTA Strength
+- Copy Resonance
+- Trust & Credibility
 
-Return a JSON array of objects with these fields:
-- section: Name of the page section (Hero, Mid Page, CTA, Footer, etc.)
-- label: Issue type (Clarity, Copy, CTA, Trust, Design)
-- issue: Description of the problem
-- suggestion: Clear, actionable improvement
-- example_text: Example of better copy or design
-- highlight_area: (Optional) Approximate coordinates of the issue (x, y, width, height)`;
+Context:
+- Goal: ${goal}
+- Audience: ${audience}
+- Tone: ${tone}
+
+For each area, return a JSON object with:
+- category
+- section
+- issue
+- suggestion
+- example
+
+Example return:
+[
+  {
+    "category": "Clarity",
+    "section": "Hero",
+    "issue": "Headline lacks clear value proposition.",
+    "suggestion": "Rewrite the headline to highlight the benefit.",
+    "example": "Save hours with AI-powered onboarding."
+  }
+]
+
+Return ONLY the JSON. No extra explanation.`;
 
     // Call the OpenAI API
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -87,7 +103,7 @@ Return a JSON array of objects with these fields:
             content: [
               {
                 type: "text",
-                text: "Analyze this landing page screenshot and provide detailed, actionable feedback for improvement. Structure your response as a JSON array."
+                text: "Analyze this landing page screenshot and provide detailed, actionable feedback for improvement."
               },
               {
                 type: "image_url",
@@ -117,7 +133,7 @@ Return a JSON array of objects with these fields:
       const rawResponse = openAIData.choices[0].message.content;
       console.log("Raw response:", rawResponse.substring(0, 200) + "...");
       
-      // Handle different response formats
+      // Parse the JSON response
       let parsedResponse;
       try {
         parsedResponse = JSON.parse(rawResponse);
@@ -126,15 +142,15 @@ Return a JSON array of objects with these fields:
         throw new Error("Failed to parse OpenAI response as valid JSON");
       }
       
-      // Process the parsed response - handle both array and object formats
+      // Handle different response formats
       let comments = [];
       
       if (Array.isArray(parsedResponse)) {
-        // Direct array format
+        // Direct array format as requested
         comments = parsedResponse;
-      } else if (parsedResponse.feedback && Array.isArray(parsedResponse.feedback)) {
-        // Object with feedback array
-        comments = parsedResponse.feedback;
+      } else if (parsedResponse.roast && Array.isArray(parsedResponse.roast)) {
+        // Object with roast array
+        comments = parsedResponse.roast;
       } else {
         // Try to find any array property
         const arrayProps = Object.keys(parsedResponse).filter(key => 
@@ -147,15 +163,15 @@ Return a JSON array of objects with these fields:
         }
       }
       
-      // Standardize the comment format
+      // Standardize the comment format for compatibility with the existing UI
       const standardizedComments = comments.map((item, index) => ({
         id: index + 1,
         section: item.section || "Page",
-        category: item.label || item.category || "General",
+        category: item.category || "General",
         issue: item.issue || "",
-        solution: item.suggestion || item.solution || "",
-        example: item.example_text || item.example || "",
-        highlightArea: item.highlight_area || item.highlightArea || {
+        solution: item.suggestion || "",
+        example: item.example || "",
+        highlightArea: item.highlightArea || {
           x: 0,
           y: 0,
           width: 0,
@@ -164,16 +180,33 @@ Return a JSON array of objects with these fields:
       }));
       
       // Generate scores based on categories
-      const categories = standardizedComments.map(item => (item.category || "").toLowerCase());
-      const uniqueCategories = [...new Set(categories)];
+      const calculateCategoryScore = (category) => {
+        const categoryComments = comments.filter(item => 
+          (item.category || "").toLowerCase() === category.toLowerCase()
+        );
+        
+        // More comments in a category = lower score
+        if (categoryComments.length === 0) return 95; // Nearly perfect if no issues
+        if (categoryComments.length === 1) return Math.floor(Math.random() * 10) + 80; // 80-90
+        if (categoryComments.length === 2) return Math.floor(Math.random() * 10) + 70; // 70-80
+        if (categoryComments.length === 3) return Math.floor(Math.random() * 10) + 60; // 60-70
+        return Math.floor(Math.random() * 15) + 50; // 50-65 for 4+ issues
+      };
       
+      // Calculate scores for each category
       const scores = {
-        overall: Math.floor(Math.random() * 40) + 60, // Base score between 60-100
-        visualHierarchy: uniqueCategories.includes('design') ? Math.floor(Math.random() * 30) + 70 : 85,
-        valueProposition: uniqueCategories.includes('clarity') ? Math.floor(Math.random() * 30) + 70 : 85,
-        ctaStrength: uniqueCategories.includes('cta') ? Math.floor(Math.random() * 30) + 70 : 85,
-        copyResonance: uniqueCategories.includes('copy') ? Math.floor(Math.random() * 30) + 70 : 85,
-        trustCredibility: uniqueCategories.includes('trust') ? Math.floor(Math.random() * 30) + 70 : 85
+        overall: Math.floor(
+          (calculateCategoryScore("clarity") +
+           calculateCategoryScore("visual hierarchy") +
+           calculateCategoryScore("cta") +
+           calculateCategoryScore("copy") +
+           calculateCategoryScore("trust")) / 5
+        ),
+        visualHierarchy: calculateCategoryScore("visual hierarchy"),
+        valueProposition: calculateCategoryScore("clarity"),
+        ctaStrength: calculateCategoryScore("cta"),
+        copyResonance: calculateCategoryScore("copy"),
+        trustCredibility: calculateCategoryScore("trust")
       };
       
       // Return the structured response
@@ -181,6 +214,7 @@ Return a JSON array of objects with these fields:
         JSON.stringify({
           comments: standardizedComments,
           scores,
+          source: "gpt-4o",
           rawAnalysis: rawResponse.substring(0, 500) // Include truncated raw analysis for debugging
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
