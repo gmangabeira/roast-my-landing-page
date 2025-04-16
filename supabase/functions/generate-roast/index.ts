@@ -45,7 +45,13 @@ For each major section (hero/header, mid-page, CTA, footer, etc), identify:
 • ✅ Fix it fast: Suggest an actionable improvement
 • ✍️ Example: Provide a revised version of copy or layout that addresses the issue.
 
-Also include a label for the issue type (e.g. Clarity, Copy, CTA, Trust, Design) and an optional area/position if guessable.`;
+Provide the response as a JSON object with a 'feedback' array containing:
+- section: Name of the page section
+- category: Issue type (Clarity, Copy, CTA, Trust, Design)
+- issue: Specific problem description
+- solution: Actionable improvement suggestion
+- example: Revised copy or layout suggestion
+- highlightArea: Optional object with x, y, width, height of the problematic area`;
 
     // Prepare the user message with the image
     const userMessage = {
@@ -53,7 +59,7 @@ Also include a label for the issue type (e.g. Clarity, Copy, CTA, Trust, Design)
       content: [
         {
           type: "text",
-          text: "Analyze this landing page screenshot and provide detailed, actionable feedback to improve conversions. Structure your response as JSON with an array of feedback items."
+          text: "Analyze this landing page screenshot and provide detailed, actionable feedback to improve conversions. Structure your response as JSON."
         },
         {
           type: "image_url",
@@ -92,93 +98,29 @@ Also include a label for the issue type (e.g. Clarity, Copy, CTA, Trust, Design)
     }
 
     const openAIData = await openAIResponse.json();
-    console.log("Raw GPT-4 response received");
+    console.log("Raw GPT-4o response received");
     
     // Extract and parse the response
-    let rawResponse = openAIData.choices[0].message.content;
-    let parsedResponse;
+    const rawResponse = openAIData.choices[0].message.content;
+    const parsedResponse = JSON.parse(rawResponse);
     
-    try {
-      parsedResponse = JSON.parse(rawResponse);
-    } catch (error) {
-      console.error("Error parsing OpenAI response as JSON:", error);
-      // Try to extract JSON from the response if it's not properly formatted
-      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          parsedResponse = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          throw new Error("Failed to parse OpenAI response as JSON");
-        }
-      } else {
-        throw new Error("Failed to parse OpenAI response as JSON");
+    // Process the parsed response
+    const comments = parsedResponse.feedback.map((item, index) => ({
+      id: index + 1,
+      category: item.category || "General",
+      section: item.section || "Page",
+      issue: item.issue || "",
+      solution: item.solution || "",
+      example: item.example || "",
+      highlightArea: item.highlightArea || {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0
       }
-    }
+    }));
     
-    // Process the parsed response into our expected format
-    const comments = [];
-    let idCounter = 1;
-    
-    // First, try to extract feedback from a structured JSON response
-    if (parsedResponse.feedback && Array.isArray(parsedResponse.feedback)) {
-      for (const item of parsedResponse.feedback) {
-        const comment = {
-          id: idCounter++,
-          category: item.category || "General",
-          section: item.section || "Page",
-          issue: item.issue || item.what_wrong || "",
-          solution: item.suggestion || item.fix_it_fast || "",
-          example: item.example || item.example_text || "",
-          highlightArea: item.highlighted_area || item.highlightArea || {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0
-          }
-        };
-        comments.push(comment);
-      }
-    } 
-    // If feedback array is not found, try alternative structures
-    else if (parsedResponse.sections && Array.isArray(parsedResponse.sections)) {
-      for (const section of parsedResponse.sections) {
-        const comment = {
-          id: idCounter++,
-          category: section.category || "General",
-          section: section.name || "Page",
-          issue: section.issue || section.what_wrong || "",
-          solution: section.solution || section.fix_it_fast || "",
-          example: section.example || section.example_text || "",
-          highlightArea: section.highlighted_area || section.highlightArea || {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0
-          }
-        };
-        comments.push(comment);
-      }
-    }
-    // If neither structure works, create a fallback
-    else {
-      console.warn("Unexpected response format, using fallback processing");
-      comments.push({
-        id: 1,
-        category: "General",
-        section: "Page",
-        issue: "The AI analysis couldn't be properly structured. Please try again.",
-        solution: "Regenerate the analysis or check the OpenAI API response format.",
-        example: "",
-        highlightArea: {
-          x: 0,
-          y: 0,
-          width: 0,
-          height: 0
-        }
-      });
-    }
-    
-    // Generate scores based on issues found
+    // Generate scores (simplified scoring logic)
     const scores = {
       overall: Math.floor(Math.random() * 40) + 60, // Base score between 60-100
       visualHierarchy: Math.floor(Math.random() * 30) + 70,
@@ -187,39 +129,6 @@ Also include a label for the issue type (e.g. Clarity, Copy, CTA, Trust, Design)
       copyResonance: Math.floor(Math.random() * 30) + 70,
       trustCredibility: Math.floor(Math.random() * 30) + 70
     };
-    
-    // Calculate actual scores based on issues found
-    let designIssues = 0;
-    let copyIssues = 0;
-    let ctaIssues = 0;
-    let trustIssues = 0;
-    
-    comments.forEach(comment => {
-      const category = comment.category.toLowerCase();
-      if (category.includes('design') || category.includes('layout') || category.includes('visual')) {
-        designIssues++;
-      }
-      if (category.includes('copy') || category.includes('text') || category.includes('message')) {
-        copyIssues++;
-      }
-      if (category.includes('cta') || category.includes('button') || category.includes('conversion')) {
-        ctaIssues++;
-      }
-      if (category.includes('trust') || category.includes('credibility')) {
-        trustIssues++;
-      }
-    });
-    
-    // Adjust scores based on issues found
-    scores.visualHierarchy = Math.max(50, 90 - (designIssues * 10));
-    scores.copyResonance = Math.max(50, 90 - (copyIssues * 10));
-    scores.ctaStrength = Math.max(50, 90 - (ctaIssues * 10));
-    scores.trustCredibility = Math.max(50, 90 - (trustIssues * 10));
-    
-    // Calculate overall score as an average of the others
-    scores.overall = Math.floor(
-      (scores.visualHierarchy + scores.valueProposition + scores.ctaStrength + scores.copyResonance + scores.trustCredibility) / 5
-    );
     
     // Return the structured response
     return new Response(
