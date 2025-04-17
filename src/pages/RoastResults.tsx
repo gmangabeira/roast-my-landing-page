@@ -38,6 +38,7 @@ const RoastResults = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const fetchRoastData = async () => {
@@ -132,26 +133,47 @@ const RoastResults = () => {
 
       } catch (error: any) {
         console.error('Error loading roast:', error);
-        toast({
-          title: "Error loading roast",
-          description: error.message || "Could not load roast data",
-          variant: "destructive",
-        });
-        navigate('/');
+        
+        // If we've already retried 3 times, show the error and give up
+        if (retryCount >= 2) {
+          toast({
+            title: "Error loading roast",
+            description: error.message || "Could not load roast data after multiple attempts",
+            variant: "destructive",
+          });
+          navigate('/');
+        } else {
+          // Increment retry count and try again after a delay
+          setRetryCount(prev => prev + 1);
+          toast({
+            title: "Retrying analysis",
+            description: `Attempt ${retryCount + 1} of 3...`,
+            variant: "default",
+          });
+          
+          // Wait 2 seconds before retrying
+          setTimeout(() => {
+            setIsLoading(true);
+            setIsGenerating(false);
+          }, 2000);
+          return; // Don't set isLoading to false yet
+        }
       } finally {
         setIsLoading(false);
         setIsGenerating(false);
       }
     };
 
-    fetchRoastData();
-  }, [location.state, navigate, toast]);
+    if (isLoading) {
+      fetchRoastData();
+    }
+  }, [location.state, navigate, toast, isLoading, retryCount]);
 
   const goBack = () => {
     navigate('/');
   };
 
-  if (isLoading) {
+  if (isLoading || isGenerating) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -160,8 +182,13 @@ const RoastResults = () => {
             <div className="inline-block animate-spin mb-4">
               <Zap size={32} className="text-brand-green" />
             </div>
-            <h2 className="text-xl font-semibold">Analyzing your landing page...</h2>
-            <p className="text-gray-500 mt-2">This may take a moment</p>
+            <h2 className="text-xl font-semibold">
+              {isGenerating ? "Analyzing your landing page..." : "Loading roast data..."}
+            </h2>
+            <p className="text-gray-500 mt-2">
+              {isGenerating ? "This may take a minute or two" : "Please wait..."}
+              {retryCount > 0 && ` (Attempt ${retryCount + 1} of 3)`}
+            </p>
           </div>
         </main>
       </div>

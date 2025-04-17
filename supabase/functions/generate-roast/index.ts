@@ -1,15 +1,19 @@
 
+// Import the necessary Deno modules
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
+// Get the OpenAI API key from environment variables
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
+// Set up CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Main function to handle incoming requests
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,12 +21,14 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body ONCE to avoid recursion issues
+    console.log("Received request to generate-roast");
+    
+    // Parse the request body ONCE to avoid recursion issues
     let requestData;
     try {
       const bodyText = await req.text(); // Get raw text first
       requestData = bodyText ? JSON.parse(bodyText) : {};
-      console.log("Request data parsed successfully:", Object.keys(requestData));
+      console.log("Request data parsed successfully");
     } catch (parseError) {
       console.error("Error parsing request JSON:", parseError);
       throw new Error('Invalid JSON in request body');
@@ -52,21 +58,31 @@ serve(async (req) => {
     
     // Fetch the image data
     console.log("Fetching image from URL...");
-    let imageResponse;
-    try {
-      imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
-      }
-    } catch (fetchError) {
-      console.error("Error fetching image:", fetchError);
-      throw new Error(`Failed to fetch image: ${fetchError.message}`);
+    const imageResponse = await fetch(imageUrl);
+    
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
     }
     
-    // Convert image to base64
+    // Convert image to base64 with proper error handling
     console.log("Converting image to base64...");
     const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    
+    // Check image size - 10MB limit
+    if (imageBuffer.byteLength > 10 * 1024 * 1024) {
+      throw new Error('Image exceeds maximum size of 10MB');
+    }
+    
+    // Convert to base64 in chunks to avoid stack overflow
+    let base64Image = '';
+    const bytes = new Uint8Array(imageBuffer);
+    const chunkSize = 1024 * 1024; // Process 1MB at a time
+    
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.slice(i, Math.min(i + chunkSize, bytes.length));
+      base64Image += btoa(String.fromCharCode.apply(null, chunk));
+    }
+    
     const dataUri = `data:${imageResponse.headers.get('content-type') || 'image/png'};base64,${base64Image}`;
     
     // Prepare the GPT-4o Vision prompt
@@ -104,45 +120,39 @@ Return ONLY a valid JSON array with objects in this exact format:
 
     // Call the OpenAI API with GPT-4o Vision
     console.log("Calling OpenAI API with GPT-4o...");
-    let openAIResponse;
-    try {
-      openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openAIApiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Analyze this landing page screenshot and provide detailed, actionable feedback for improving conversion rates."
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: dataUri
-                  }
+    const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openAIApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this landing page screenshot and provide detailed, actionable feedback for improving conversion rates."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: dataUri
                 }
-              ]
-            }
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: 2500
-        })
-      });
-    } catch (openAIError) {
-      console.error("Error calling OpenAI API:", openAIError);
-      throw new Error(`OpenAI API call failed: ${openAIError.message}`);
-    }
+              }
+            ]
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2500
+      })
+    });
 
     if (!openAIResponse.ok) {
       const errorData = await openAIResponse.json();
@@ -182,28 +192,55 @@ Return ONLY a valid JSON array with objects in this exact format:
       comments = parsedResponse;
       console.log(`Found ${comments.length} comments in array format`);
     } else if (typeof parsedResponse === 'object') {
-      // Look for any array property that might contain the comments
-      const potentialArrays = Object.entries(parsedResponse)
-        .filter(([_, value]) => Array.isArray(value) && value.length > 0);
-      
-      if (potentialArrays.length > 0) {
-        // Use the first array property found (likely to be the comments)
-        const [arrayKey, arrayValue] = potentialArrays[0];
-        comments = arrayValue;
-        console.log(`Found ${comments.length} comments in object property '${arrayKey}'`);
-      } else {
-        console.error("No valid array found in response:", parsedResponse);
-        throw new Error("Could not find valid feedback array in API response");
+      // Check for array property
+      for (const key in parsedResponse) {
+        if (Array.isArray(parsedResponse[key]) && parsedResponse[key].length > 0) {
+          comments = parsedResponse[key];
+          console.log(`Found ${comments.length} comments in object property '${key}'`);
+          break;
+        }
       }
-    } else {
-      console.error("Unexpected response format:", typeof parsedResponse);
-      throw new Error("OpenAI response is neither an array nor an object with an array property");
+      
+      // If no array property found, try to extract from nested structure
+      if (comments.length === 0) {
+        console.error("No valid array found in response, trying to extract comments");
+        
+        // Look for any array anywhere in the nested object
+        const findArrays = (obj, path = '') => {
+          if (!obj || typeof obj !== 'object') return;
+          
+          for (const key in obj) {
+            const newPath = path ? `${path}.${key}` : key;
+            
+            if (Array.isArray(obj[key]) && obj[key].length > 0) {
+              if (obj[key][0] && (obj[key][0].section || obj[key][0].category || obj[key][0].issue)) {
+                comments = obj[key];
+                console.log(`Found ${comments.length} comments in nested path: ${newPath}`);
+                return;
+              }
+            } else if (typeof obj[key] === 'object') {
+              findArrays(obj[key], newPath);
+              if (comments.length > 0) return; // Stop if we found comments
+            }
+          }
+        };
+        
+        findArrays(parsedResponse);
+      }
     }
     
-    // Validate that we have at least some comments
-    if (!comments || comments.length === 0) {
-      console.error("No comments found in the parsed response");
-      throw new Error("No feedback items found in the analysis");
+    // If still no comments, try to reconstruct from different fields
+    if (comments.length === 0) {
+      console.error("Attempting to reconstruct comments from response:", parsedResponse);
+      
+      // Try to generate a simple comment if everything else fails
+      comments = [{
+        section: "Page",
+        category: "General",
+        issue: "Unable to extract specific feedback from AI analysis.",
+        suggestion: "Please try again with a clearer image of your landing page.",
+        example: "Ensure the image clearly shows all page elements including text, buttons, and visuals."
+      }];
     }
     
     // Standardize the comment format for compatibility with the frontend
