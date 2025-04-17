@@ -77,7 +77,8 @@ const RoastResults = () => {
         setIsGenerating(true);
         
         console.log("Generating roast analysis with GPT-4o Vision");
-        // Generate roast comments using our GPT-4 Vision edge function
+        
+        // Generate roast comments using our GPT-4o Vision edge function
         const commentsResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-roast', {
           method: 'POST',
           headers: {
@@ -92,7 +93,13 @@ const RoastResults = () => {
         });
 
         if (!commentsResponse.ok) {
-          const errorText = await commentsResponse.text();
+          let errorText = '';
+          try {
+            const errorJson = await commentsResponse.json();
+            errorText = JSON.stringify(errorJson);
+          } catch (e) {
+            errorText = await commentsResponse.text();
+          }
           console.error("Error from generate-roast function:", errorText);
           throw new Error(`Failed to generate roast feedback: ${errorText}`);
         }
@@ -185,7 +192,7 @@ const RoastResults = () => {
           <Button 
             variant="ghost" 
             className="gap-2 mb-4" 
-            onClick={goBack}
+            onClick={() => navigate('/')}
           >
             <ArrowLeft size={16} />
             Back to Home
