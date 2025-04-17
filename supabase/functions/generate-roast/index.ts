@@ -17,10 +17,10 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body - do this only once and store it in a variable
+    // Parse request body (only once)
     const requestData = await req.json();
     
-    // Extract required fields with fallbacks
+    // Extract image URL and other fields
     const imageUrl = requestData.image_url || requestData.screenshot_url;
     const context = requestData.context || "Landing page";
     const goal = requestData.goal || requestData.page_goal || "Increase conversions";
@@ -218,7 +218,7 @@ Return ONLY the JSON. No extra explanation.`;
           comments: standardizedComments,
           scores,
           source: "gpt-4o",
-          rawAnalysis: rawResponse.substring(0, 500) // Include truncated raw analysis for debugging
+          screenshot_url: imageUrl // Return the screenshot URL for display
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

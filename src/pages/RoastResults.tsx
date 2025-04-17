@@ -11,11 +11,30 @@ import ScreenshotPanel from '@/components/roast/ScreenshotPanel';
 import ScorePanel from '@/components/roast/ScorePanel';
 import CommentsPanel from '@/components/roast/CommentsPanel';
 
+interface RoastData {
+  id: string;
+  title: string;
+  url?: string;
+  screenshot_url: string;
+  page_goal?: string;
+  audience?: string;
+  brand_tone?: string;
+  comments: any[];
+  scores: {
+    overall: number;
+    visualHierarchy: number;
+    valueProposition: number;
+    ctaStrength: number;
+    copyResonance: number;
+    trustCredibility: number;
+  };
+}
+
 const RoastResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [roastData, setRoastData] = useState<any>(null);
+  const [roastData, setRoastData] = useState<RoastData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -33,17 +52,23 @@ const RoastResults = () => {
           return;
         }
 
+        console.log("Fetching roast with ID:", location.state.roastId);
         const { data: roast, error } = await supabase
           .from('roasts')
           .select('*')
           .eq('id', location.state.roastId)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching roast:", error);
+          throw error;
+        }
 
         if (!roast) {
           throw new Error('Roast not found');
         }
+
+        console.log("Roast data retrieved:", roast);
 
         if (!roast.screenshot_url) {
           throw new Error('Screenshot not available');
@@ -51,6 +76,7 @@ const RoastResults = () => {
 
         setIsGenerating(true);
         
+        console.log("Generating roast analysis with GPT-4o Vision");
         // Generate roast comments using our GPT-4 Vision edge function
         const commentsResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-roast', {
           method: 'POST',
@@ -58,7 +84,7 @@ const RoastResults = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            screenshot_url: roast.screenshot_url,
+            image_url: roast.screenshot_url,
             page_goal: roast.page_goal || 'Increase conversions',
             audience: roast.audience || 'General audience',
             brand_tone: roast.brand_tone || 'Professional'
@@ -66,10 +92,13 @@ const RoastResults = () => {
         });
 
         if (!commentsResponse.ok) {
-          throw new Error('Failed to generate roast feedback');
+          const errorText = await commentsResponse.text();
+          console.error("Error from generate-roast function:", errorText);
+          throw new Error(`Failed to generate roast feedback: ${errorText}`);
         }
 
         const commentsData = await commentsResponse.json();
+        console.log("Analysis data received:", commentsData);
         
         if (commentsData.error) {
           throw new Error(commentsData.error);

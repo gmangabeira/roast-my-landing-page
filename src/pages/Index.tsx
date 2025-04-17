@@ -20,13 +20,19 @@ const Index = () => {
   const [brandTone, setBrandTone] = useState('');
   const [formExpanded, setFormExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const handleFileChange = (newFile: File | null) => {
     setFile(newFile);
   };
 
+  const handleImageUploaded = (url: string) => {
+    setUploadedImageUrl(url);
+    console.log("Image URL saved:", url);
+  };
+
   const handleSubmit = async () => {
-    if (!file && document.querySelector('input[type="url"]')?.getAttribute('value') === '') {
+    if (!uploadedImageUrl && !file) {
       toast({
         title: "Missing content",
         description: "Please upload a screenshot or enter a URL to analyze",
@@ -38,10 +44,11 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      let screenshotUrl = "";
+      let screenshotUrl = uploadedImageUrl || "";
       
-      // If there's a file, upload it to Supabase Storage
-      if (file) {
+      // If there's a file but no uploadedImageUrl (in case direct upload failed)
+      if (file && !uploadedImageUrl) {
+        console.log("Uploading file now...");
         const timestamp = Date.now();
         const fileExt = file.name.split('.').pop();
         const filePath = `${user?.id || 'anonymous'}/${timestamp}.${fileExt}`;
@@ -58,10 +65,12 @@ const Index = () => {
           .getPublicUrl(filePath);
           
         screenshotUrl = publicUrl;
-      } else {
-        // If there's a URL entered, generate a screenshot
+        console.log("Image uploaded to:", screenshotUrl);
+      } else if (!uploadedImageUrl) {
+        // If there's a URL entered but no file or uploadedImageUrl
         const url = document.querySelector('input[type="url"]')?.getAttribute('value');
         if (url) {
+          console.log("Generating screenshot from URL:", url);
           const screenshotResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-screenshot', {
             method: 'POST',
             headers: {
@@ -76,10 +85,16 @@ const Index = () => {
           
           const screenshotData = await screenshotResponse.json();
           screenshotUrl = screenshotData.screenshot_url;
+          console.log("Screenshot generated:", screenshotUrl);
         }
       }
       
+      if (!screenshotUrl) {
+        throw new Error('No screenshot URL available');
+      }
+      
       // Create a new roast record
+      console.log("Creating roast record with screenshot:", screenshotUrl);
       const { data, error } = await supabase
         .from('roasts')
         .insert([
@@ -98,12 +113,13 @@ const Index = () => {
       if (error) throw error;
       
       if (data && data.length > 0) {
+        console.log("Roast record created:", data[0].id);
         // Navigate to the results page with the roast ID
         navigate('/roast-results', { state: { roastId: data[0].id } });
       } else {
         throw new Error('Failed to create roast record');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: "Error",
@@ -136,7 +152,10 @@ const Index = () => {
             <div className="p-6 md:p-8">
               <h2 className="text-xl font-semibold mb-4">Upload Your Landing Page</h2>
               
-              <UploadBox onFileChange={handleFileChange} />
+              <UploadBox 
+                onFileChange={handleFileChange} 
+                onImageUploaded={handleImageUploaded}
+              />
               
               <ContextForm 
                 pageGoal={pageGoal}
