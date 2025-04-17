@@ -18,24 +18,27 @@ serve(async (req) => {
 
   try {
     // Parse request body - do this only once
-    const body = await req.json();
+    const requestData = await req.json();
     
-    // Extract required fields
-    const imageUrl = body.image_url;
-    const goal = body.goal || "Increase conversions";
-    const audience = body.audience || "General audience";
-    const tone = body.tone || "Professional";
+    // Extract required fields with fallbacks
+    const imageUrl = requestData.image_url || requestData.screenshot_url;
+    const context = requestData.context || "Landing page";
+    const goal = requestData.goal || requestData.page_goal || "Increase conversions";
+    const audience = requestData.audience || "General audience";
+    const tone = requestData.tone || requestData.brand_tone || "Professional";
     
+    // Validate image URL
     if (!imageUrl) {
-      throw new Error('Image URL is required');
+      throw new Error('Image URL is required. Please provide image_url or screenshot_url in the request body.');
     }
 
+    // Validate OpenAI API key
     if (!openAIApiKey) {
-      throw new Error('OpenAI API key is not configured');
+      throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.');
     }
 
     console.log(`Analyzing image: ${imageUrl}`);
-    console.log(`Goal: ${goal}, Audience: ${audience}, Tone: ${tone}`);
+    console.log(`Context: ${context}, Goal: ${goal}, Audience: ${audience}, Tone: ${tone}`);
     
     // Fetch the image data
     const imageResponse = await fetch(imageUrl);
@@ -48,7 +51,7 @@ serve(async (req) => {
     const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
     const dataUri = `data:${imageResponse.headers.get('content-type') || 'image/png'};base64,${base64Image}`;
     
-    // Prepare the system prompt
+    // Prepare the GPT-4o Vision prompt
     const systemPrompt = `You are a senior CRO expert.
 
 Analyze the landing page image below for:
@@ -84,7 +87,7 @@ Example return:
 
 Return ONLY the JSON. No extra explanation.`;
 
-    // Call the OpenAI API
+    // Call the OpenAI API with GPT-4o
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -167,10 +170,10 @@ Return ONLY the JSON. No extra explanation.`;
       const standardizedComments = comments.map((item, index) => ({
         id: index + 1,
         section: item.section || "Page",
-        category: item.category || "General",
+        category: item.category || item.label || "General",
         issue: item.issue || "",
         solution: item.suggestion || "",
-        example: item.example || "",
+        example: item.example || item.example_text || "",
         highlightArea: item.highlightArea || {
           x: 0,
           y: 0,
@@ -182,7 +185,7 @@ Return ONLY the JSON. No extra explanation.`;
       // Generate scores based on categories
       const calculateCategoryScore = (category) => {
         const categoryComments = comments.filter(item => 
-          (item.category || "").toLowerCase() === category.toLowerCase()
+          (item.category || item.label || "").toLowerCase() === category.toLowerCase()
         );
         
         // More comments in a category = lower score
