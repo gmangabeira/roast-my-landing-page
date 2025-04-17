@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body - do this only once
+    // Parse request body - do this only once and store it in a variable
     const requestData = await req.json();
     
     // Extract required fields with fallbacks
