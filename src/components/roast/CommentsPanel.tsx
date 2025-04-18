@@ -28,7 +28,19 @@ interface CommentsPanelProps {
 const CommentsPanel = ({ comments }: CommentsPanelProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   
-  const categories = ['All', 'Clarity', 'CTAs', 'Copy', 'Design', 'Trust'];
+  // Extract unique categories from comments and ensure we have all the main ones
+  const extractedCategories = comments
+    .map(comment => comment.category)
+    .filter((value, index, self) => self.indexOf(value) === index);
+  
+  // Ensure we have standard categories plus any unique ones from the data
+  const categories = ['All', 'Clarity', 'CTAs', 'Copy', 'Design', 'Trust']
+    .concat(extractedCategories.filter(cat => 
+      !['All', 'Clarity', 'CTAs', 'Copy', 'Design', 'Trust'].includes(cat)
+    ));
+  
+  // Remove duplicates
+  const uniqueCategories = [...new Set(categories)];
   
   const filteredComments = selectedCategory === 'All' 
     ? comments 
@@ -44,7 +56,7 @@ const CommentsPanel = ({ comments }: CommentsPanelProps) => {
       <CardContent className="pt-0 flex-1 overflow-hidden flex flex-col">
         {/* Category Filters */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {categories.map(category => (
+          {uniqueCategories.map(category => (
             <Button
               key={category}
               variant={selectedCategory === category ? "default" : "outline"}

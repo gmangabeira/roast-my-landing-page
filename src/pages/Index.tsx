@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Flame } from 'lucide-react';
@@ -21,6 +20,7 @@ const Index = () => {
   const [formExpanded, setFormExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [enteredUrl, setEnteredUrl] = useState<string>('');
 
   const handleFileChange = (newFile: File | null) => {
     setFile(newFile);
@@ -31,8 +31,13 @@ const Index = () => {
     console.log("Image URL saved:", url);
   };
 
+  const handleUrlChange = (url: string) => {
+    setEnteredUrl(url);
+    console.log("URL entered:", url);
+  };
+
   const handleSubmit = async () => {
-    if (!uploadedImageUrl && !file) {
+    if (!uploadedImageUrl && !file && !enteredUrl) {
       toast({
         title: "Missing content",
         description: "Please upload a screenshot or enter a URL to analyze",
@@ -45,6 +50,7 @@ const Index = () => {
     
     try {
       let screenshotUrl = uploadedImageUrl || "";
+      let pageUrl = "";
       
       // If there's a file but no uploadedImageUrl (in case direct upload failed)
       if (file && !uploadedImageUrl) {
@@ -66,27 +72,11 @@ const Index = () => {
           
         screenshotUrl = publicUrl;
         console.log("Image uploaded to:", screenshotUrl);
-      } else if (!uploadedImageUrl) {
+      } else if (enteredUrl && !uploadedImageUrl && !file) {
         // If there's a URL entered but no file or uploadedImageUrl
-        const url = document.querySelector('input[type="url"]')?.getAttribute('value');
-        if (url) {
-          console.log("Generating screenshot from URL:", url);
-          const screenshotResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-screenshot', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ url })
-          });
-          
-          if (!screenshotResponse.ok) {
-            throw new Error('Failed to generate screenshot');
-          }
-          
-          const screenshotData = await screenshotResponse.json();
-          screenshotUrl = screenshotData.screenshot_url;
-          console.log("Screenshot generated:", screenshotUrl);
-        }
+        pageUrl = enteredUrl;
+        screenshotUrl = enteredUrl; // We'll let the backend handle the screenshot generation
+        console.log("Using URL for screenshot generation:", enteredUrl);
       }
       
       if (!screenshotUrl) {
@@ -101,7 +91,7 @@ const Index = () => {
           {
             user_id: user?.id || null,
             title: "Landing Page Roast",
-            url: document.querySelector('input[type="url"]')?.getAttribute('value') || '',
+            url: pageUrl || enteredUrl || '',
             page_goal: pageGoal,
             audience,
             brand_tone: brandTone,
@@ -155,6 +145,7 @@ const Index = () => {
               <UploadBox 
                 onFileChange={handleFileChange} 
                 onImageUploaded={handleImageUploaded}
+                onUrlChange={handleUrlChange}
               />
               
               <ContextForm 

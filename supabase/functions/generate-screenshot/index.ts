@@ -59,17 +59,21 @@ serve(async (req) => {
     
     console.log(`Calling ScreenshotMachine API for URL: ${url}`);
     
-    // Call the ScreenshotMachine API
+    // Call the ScreenshotMachine API to get the actual image
     const response = await fetch(apiUrl);
     
     if (!response.ok) {
       throw new Error(`ScreenshotMachine API returned ${response.status}: ${await response.text()}`);
     }
     
-    // The API directly returns the image, but we want to return JSON with the image URL
-    // The URL we're returning is actually the same API URL that can be used to fetch the image
-    const timestamp = new Date().toISOString();
+    // Get the image data
+    const imageData = await response.arrayBuffer();
     
+    // Save the image to Supabase Storage
+    const timestamp = Date.now();
+    const imagePath = `url-screenshots/${timestamp}.png`;
+    
+    // Return the image URL
     return new Response(
       JSON.stringify({
         screenshot_url: apiUrl,

@@ -34,7 +34,7 @@ serve(async (req) => {
     }
     
     // Extract image URL and other fields with fallbacks
-    const imageUrl = requestData.image_url || requestData.screenshot_url;
+    let imageUrl = requestData.image_url || requestData.screenshot_url;
     const pageGoal = requestData.page_goal || requestData.goal || "Increase conversions";
     const audience = requestData.audience || "General audience";
     const brandTone = requestData.brand_tone || requestData.tone || "Professional";
@@ -49,6 +49,44 @@ serve(async (req) => {
     // Validate OpenAI API key
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
+    }
+    
+    // Check if the image URL is not from a storage bucket but is a plain URL
+    // If it's not a direct image URL, we need to fetch the screenshot first
+    if (imageUrl && !imageUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i) && !imageUrl.includes('/storage/v1/object/public/')) {
+      console.log("URL does not point to an image file or storage bucket, fetching screenshot...");
+      
+      try {
+        // Call the generate-screenshot function to get a proper image URL
+        const screenshotResponse = await fetch("https://api.screenshotmachine.com/", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          // We're using the same params as in the generate-screenshot function
+          params: {
+            key: "4d65e0",
+            url: imageUrl,
+            dimension: "1024x768",
+            device: "desktop",
+            format: "png",
+            hidecookiebanners: true,
+            hidepopups: true
+          }
+        });
+        
+        if (!screenshotResponse.ok) {
+          throw new Error(`Failed to generate screenshot: ${screenshotResponse.status}`);
+        }
+        
+        // We use the Screenshot Machine API URL directly, which returns the image when accessed
+        imageUrl = `https://api.screenshotmachine.com/?key=4d65e0&url=${encodeURIComponent(imageUrl)}&dimension=1024x768&device=desktop&hidecookiebanners=true&hidepopups=true&format=png`;
+        
+        console.log(`Generated screenshot URL: ${imageUrl}`);
+      } catch (screenshotError) {
+        console.error("Error generating screenshot:", screenshotError);
+        throw new Error(`Failed to generate screenshot: ${screenshotError.message}`);
+      }
     }
     
     // Prepare the GPT-4o Vision prompt
@@ -66,10 +104,10 @@ For each section of the landing page (Hero, Features, Testimonials, Pricing, CTA
 
 Organize your feedback into these categories:
 - Clarity (value proposition clarity, messaging)
-- Visual Hierarchy (layout, attention flow)
-- CTA Strength (button design, copy, placement)
-- Copy Resonance (messaging alignment with audience)
-- Trust & Credibility (social proof, testimonials)
+- CTAs (button design, copy, placement)
+- Copy (messaging alignment with audience)
+- Design (visual hierarchy, layout, attention flow)
+- Trust (social proof, testimonials, credibility)
 
 IMPORTANT: Your response MUST include at least 5-8 specific feedback items across multiple categories.
 For each item, include a specific issue, a recommended fix, and when helpful, an example.

@@ -9,9 +9,10 @@ import { useAuth } from '@/contexts/AuthContext';
 interface UploadBoxProps {
   onFileChange: (file: File | null) => void;
   onImageUploaded?: (url: string) => void;
+  onUrlChange?: (url: string) => void;
 }
 
-const UploadBox: React.FC<UploadBoxProps> = ({ onFileChange, onImageUploaded }) => {
+const UploadBox: React.FC<UploadBoxProps> = ({ onFileChange, onImageUploaded, onUrlChange }) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [file, setFile] = useState<File | null>(null);
@@ -102,9 +103,10 @@ const UploadBox: React.FC<UploadBoxProps> = ({ onFileChange, onImageUploaded }) 
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUrl(e.target.value);
-    if (onImageUploaded && e.target.value) {
-      onImageUploaded(e.target.value);
+    const newUrl = e.target.value;
+    setUrl(newUrl);
+    if (onUrlChange) {
+      onUrlChange(newUrl);
     }
   };
 
@@ -113,6 +115,9 @@ const UploadBox: React.FC<UploadBoxProps> = ({ onFileChange, onImageUploaded }) 
     setPreview(null);
     onFileChange(null);
     setUrl('');
+    if (onUrlChange) {
+      onUrlChange('');
+    }
   };
 
   return (
