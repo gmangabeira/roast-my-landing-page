@@ -39,6 +39,7 @@ const RoastResults = () => {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRoastData = async () => {
@@ -76,6 +77,7 @@ const RoastResults = () => {
         }
 
         setIsGenerating(true);
+        setErrorMessage(null);
         
         console.log("Generating roast analysis with GPT-4o Vision");
         
@@ -112,6 +114,7 @@ const RoastResults = () => {
           throw new Error(commentsData.error);
         }
 
+        // Update the roast data with the analysis results
         setRoastData({
           ...roast,
           comments: commentsData.comments || [],
@@ -133,6 +136,7 @@ const RoastResults = () => {
 
       } catch (error: any) {
         console.error('Error loading roast:', error);
+        setErrorMessage(error.message || "An unknown error occurred");
         
         // If we've already retried 3 times, show the error and give up
         if (retryCount >= 2) {
@@ -141,7 +145,6 @@ const RoastResults = () => {
             description: error.message || "Could not load roast data after multiple attempts",
             variant: "destructive",
           });
-          navigate('/');
         } else {
           // Increment retry count and try again after a delay
           setRetryCount(prev => prev + 1);
@@ -151,11 +154,11 @@ const RoastResults = () => {
             variant: "default",
           });
           
-          // Wait 2 seconds before retrying
+          // Wait 3 seconds before retrying
           setTimeout(() => {
             setIsLoading(true);
             setIsGenerating(false);
-          }, 2000);
+          }, 3000);
           return; // Don't set isLoading to false yet
         }
       } finally {
@@ -171,6 +174,12 @@ const RoastResults = () => {
 
   const goBack = () => {
     navigate('/');
+  };
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setRetryCount(0);
+    setErrorMessage(null);
   };
 
   if (isLoading || isGenerating) {
@@ -189,6 +198,35 @@ const RoastResults = () => {
               {isGenerating ? "This may take a minute or two" : "Please wait..."}
               {retryCount > 0 && ` (Attempt ${retryCount + 1} of 3)`}
             </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <div className="text-red-500 mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Error Analyzing Page</h2>
+            <p className="text-gray-600 mb-4">{errorMessage}</p>
+            <div className="space-y-2">
+              <Button onClick={handleRetry} variant="default" className="w-full">
+                Try Again
+              </Button>
+              <Button onClick={goBack} variant="outline" className="w-full">
+                Return Home
+              </Button>
+            </div>
           </div>
         </main>
       </div>

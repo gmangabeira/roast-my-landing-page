@@ -23,11 +23,10 @@ serve(async (req) => {
   try {
     console.log("Received request to generate-roast");
     
-    // Parse the request body ONCE to avoid recursion issues
+    // Parse the request body
     let requestData;
     try {
-      const bodyText = await req.text(); // Get raw text first
-      requestData = bodyText ? JSON.parse(bodyText) : {};
+      requestData = await req.json();
       console.log("Request data parsed successfully");
     } catch (parseError) {
       console.error("Error parsing request JSON:", parseError);
@@ -40,53 +39,19 @@ serve(async (req) => {
     const audience = requestData.audience || "General audience";
     const brandTone = requestData.brand_tone || requestData.tone || "Professional";
     
-    console.log(`Processing request with: 
-      - Image URL: ${imageUrl?.substring(0, 50)}...
-      - Goal: ${pageGoal}
-      - Audience: ${audience}
-      - Tone: ${brandTone}`);
+    console.log(`Processing request with image URL: ${imageUrl?.substring(0, 50)}...`);
     
     // Validate image URL
     if (!imageUrl) {
-      throw new Error('Image URL is required. Please provide image_url or screenshot_url in the request body.');
+      throw new Error('Image URL is required');
     }
 
     // Validate OpenAI API key
     if (!openAIApiKey) {
-      throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.');
+      throw new Error('OpenAI API key not configured');
     }
-    
-    // Fetch the image data
-    console.log("Fetching image from URL...");
-    const imageResponse = await fetch(imageUrl);
-    
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
-    }
-    
-    // Convert image to base64 with proper error handling
-    console.log("Converting image to base64...");
-    const imageBuffer = await imageResponse.arrayBuffer();
-    
-    // Check image size - 10MB limit
-    if (imageBuffer.byteLength > 10 * 1024 * 1024) {
-      throw new Error('Image exceeds maximum size of 10MB');
-    }
-    
-    // Convert to base64 in chunks to avoid stack overflow
-    let base64Image = '';
-    const bytes = new Uint8Array(imageBuffer);
-    const chunkSize = 1024 * 1024; // Process 1MB at a time
-    
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.slice(i, Math.min(i + chunkSize, bytes.length));
-      base64Image += btoa(String.fromCharCode.apply(null, chunk));
-    }
-    
-    const dataUri = `data:${imageResponse.headers.get('content-type') || 'image/png'};base64,${base64Image}`;
     
     // Prepare the GPT-4o Vision prompt
-    console.log("Preparing prompt for GPT-4o...");
     const systemPrompt = `You are a senior CRO (Conversion Rate Optimization) expert analyzing landing pages.
 
 Analyze this landing page screenshot based on these contextual details:
@@ -118,8 +83,8 @@ Return ONLY a valid JSON array with objects in this exact format:
   // Additional feedback items...
 ]`;
 
-    // Call the OpenAI API with GPT-4o Vision
-    console.log("Calling OpenAI API with GPT-4o...");
+    // Call the OpenAI API directly with the image URL
+    console.log("Calling OpenAI API with GPT-4o Vision...");
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -143,7 +108,7 @@ Return ONLY a valid JSON array with objects in this exact format:
               {
                 type: "image_url",
                 image_url: {
-                  url: dataUri
+                  url: imageUrl
                 }
               }
             ]
@@ -192,48 +157,19 @@ Return ONLY a valid JSON array with objects in this exact format:
       comments = parsedResponse;
       console.log(`Found ${comments.length} comments in array format`);
     } else if (typeof parsedResponse === 'object') {
-      // Check for array property
+      // Look for an array property
       for (const key in parsedResponse) {
-        if (Array.isArray(parsedResponse[key]) && parsedResponse[key].length > 0) {
+        if (Array.isArray(parsedResponse[key])) {
           comments = parsedResponse[key];
           console.log(`Found ${comments.length} comments in object property '${key}'`);
           break;
         }
       }
-      
-      // If no array property found, try to extract from nested structure
-      if (comments.length === 0) {
-        console.error("No valid array found in response, trying to extract comments");
-        
-        // Look for any array anywhere in the nested object
-        const findArrays = (obj, path = '') => {
-          if (!obj || typeof obj !== 'object') return;
-          
-          for (const key in obj) {
-            const newPath = path ? `${path}.${key}` : key;
-            
-            if (Array.isArray(obj[key]) && obj[key].length > 0) {
-              if (obj[key][0] && (obj[key][0].section || obj[key][0].category || obj[key][0].issue)) {
-                comments = obj[key];
-                console.log(`Found ${comments.length} comments in nested path: ${newPath}`);
-                return;
-              }
-            } else if (typeof obj[key] === 'object') {
-              findArrays(obj[key], newPath);
-              if (comments.length > 0) return; // Stop if we found comments
-            }
-          }
-        };
-        
-        findArrays(parsedResponse);
-      }
     }
     
-    // If still no comments, try to reconstruct from different fields
+    // If still no comments, create a default one
     if (comments.length === 0) {
-      console.error("Attempting to reconstruct comments from response:", parsedResponse);
-      
-      // Try to generate a simple comment if everything else fails
+      console.error("No valid comments found in response, creating default");
       comments = [{
         section: "Page",
         category: "General",
@@ -248,8 +184,8 @@ Return ONLY a valid JSON array with objects in this exact format:
       id: index + 1,
       section: item.section || "Page",
       category: item.category || item.label || "General",
-      issue: item.issue || "",
-      solution: item.suggestion || "",
+      issue: item.issue || item.problem || "",
+      solution: item.suggestion || item.solution || "",
       example: item.example || item.example_text || "",
       highlightArea: item.highlightArea || {
         x: 0,
