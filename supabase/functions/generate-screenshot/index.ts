@@ -66,19 +66,12 @@ serve(async (req) => {
       throw new Error(`ScreenshotMachine API returned ${response.status}: ${await response.text()}`);
     }
     
-    // Get the image data
-    const imageData = await response.arrayBuffer();
-    
-    // Save the image to Supabase Storage
-    const timestamp = Date.now();
-    const imagePath = `url-screenshots/${timestamp}.png`;
-    
-    // Return the image URL
+    // Return the direct screenshot URL for display
     return new Response(
       JSON.stringify({
         screenshot_url: apiUrl,
         original_url: url,
-        timestamp: timestamp
+        timestamp: Date.now()
       }),
       {
         headers: { 

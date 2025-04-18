@@ -31,6 +31,7 @@ const ScreenshotPanel = ({
 }: ScreenshotPanelProps) => {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'screenshot' | 'heatmap' | 'overlay'>('screenshot');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Set view mode based on showHeatmap prop (for backward compatibility)
@@ -74,16 +75,34 @@ const ScreenshotPanel = ({
       <CardContent className="flex-1 pt-0 p-0 relative">
         <div className="rounded-md overflow-hidden bg-gray-50 w-full h-full min-h-[400px] relative">
           {/* Original Screenshot */}
-          {screenshot && (
-            <img 
-              src={screenshot} 
-              alt="Landing page screenshot" 
-              className="w-full h-auto object-contain"
-            />
+          {screenshot ? (
+            <div className="w-full h-full flex items-center justify-center overflow-auto">
+              <img 
+                src={screenshot} 
+                alt="Landing page screenshot" 
+                className="w-full h-auto object-contain"
+                onError={(e) => {
+                  console.error("Image failed to load:", screenshot);
+                  e.currentTarget.src = "/placeholder.svg";
+                  toast({
+                    title: "Image failed to load",
+                    description: "The screenshot could not be loaded. Using placeholder instead.",
+                    variant: "destructive",
+                  });
+                }}
+              />
+            </div>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <Eye size={32} className="mx-auto mb-2 opacity-20" />
+                <p className="text-sm">Screenshot not available</p>
+              </div>
+            </div>
           )}
           
           {/* Fallback Legacy Heatmap */}
-          {showHeatmap && heatmapData && (
+          {showHeatmap && heatmapData && heatmapData.length > 0 && (
             <div className="absolute top-0 left-0 w-full h-full">
               <svg className="w-full h-full" style={{ position: 'absolute', top: 0, left: 0 }}>
                 {heatmapData.map((area, i) => {
@@ -111,16 +130,6 @@ const ScreenshotPanel = ({
                   );
                 })}
               </svg>
-            </div>
-          )}
-          
-          {/* No Screenshot State */}
-          {!screenshot && (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <Eye size={32} className="mx-auto mb-2 opacity-20" />
-                <p className="text-sm">Screenshot not available</p>
-              </div>
             </div>
           )}
         </div>

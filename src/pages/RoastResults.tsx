@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Zap } from 'lucide-react';
@@ -72,8 +71,40 @@ const RoastResults = () => {
 
         console.log("Roast data retrieved:", roast);
 
-        if (!roast.screenshot_url) {
-          throw new Error('Screenshot not available');
+        let screenshotUrl = roast.screenshot_url;
+        
+        if (screenshotUrl && !screenshotUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i) && 
+            !screenshotUrl.includes('api.screenshotmachine.com') && 
+            !screenshotUrl.includes('/storage/v1/object/public/')) {
+          try {
+            console.log("Converting URL to screenshot:", screenshotUrl);
+            const screenshotResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-screenshot', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: screenshotUrl
+              })
+            });
+            
+            if (!screenshotResponse.ok) {
+              throw new Error(`Failed to generate screenshot: ${await screenshotResponse.text()}`);
+            }
+            
+            const screenshotData = await screenshotResponse.json();
+            screenshotUrl = screenshotData.screenshot_url;
+            console.log("Generated screenshot URL:", screenshotUrl);
+          } catch (screenshotError) {
+            console.error("Error generating screenshot:", screenshotError);
+          }
+        }
+        
+        if (screenshotUrl !== roast.screenshot_url) {
+          await supabase
+            .from('roasts')
+            .update({ screenshot_url: screenshotUrl })
+            .eq('id', roast.id);
         }
 
         setIsGenerating(true);
@@ -81,14 +112,13 @@ const RoastResults = () => {
         
         console.log("Generating roast analysis with GPT-4o Vision");
         
-        // Generate roast comments using our GPT-4o Vision edge function
         const commentsResponse = await fetch('https://wtrnzafcmmwxizdkfkdu.supabase.co/functions/v1/generate-roast', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            image_url: roast.screenshot_url,
+            image_url: screenshotUrl,
             page_goal: roast.page_goal || 'Increase conversions',
             audience: roast.audience || 'General audience',
             brand_tone: roast.brand_tone || 'Professional'
@@ -114,9 +144,9 @@ const RoastResults = () => {
           throw new Error(commentsData.error);
         }
 
-        // Update the roast data with the analysis results
         setRoastData({
           ...roast,
+          screenshot_url: screenshotUrl,
           comments: commentsData.comments || [],
           scores: commentsData.scores || {
             overall: 0,
@@ -138,7 +168,6 @@ const RoastResults = () => {
         console.error('Error loading roast:', error);
         setErrorMessage(error.message || "An unknown error occurred");
         
-        // If we've already retried 3 times, show the error and give up
         if (retryCount >= 2) {
           toast({
             title: "Error loading roast",
@@ -146,7 +175,6 @@ const RoastResults = () => {
             variant: "destructive",
           });
         } else {
-          // Increment retry count and try again after a delay
           setRetryCount(prev => prev + 1);
           toast({
             title: "Retrying analysis",
@@ -154,12 +182,11 @@ const RoastResults = () => {
             variant: "default",
           });
           
-          // Wait 3 seconds before retrying
           setTimeout(() => {
             setIsLoading(true);
             setIsGenerating(false);
           }, 3000);
-          return; // Don't set isLoading to false yet
+          return;
         }
       } finally {
         setIsLoading(false);
