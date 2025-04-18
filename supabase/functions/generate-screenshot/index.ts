@@ -54,8 +54,8 @@ serve(async (req) => {
     // Encode the URL for the API call
     const encodedUrl = encodeURIComponent(url);
     
-    // Construct the ScreenshotMachine API URL
-    const apiUrl = `https://api.screenshotmachine.com/?key=${screenshotApiKey}&url=${encodedUrl}&dimension=1024x768&device=desktop&hidecookiebanners=true&hidepopups=true&format=png`;
+    // Construct the ScreenshotMachine API URL with fullpage=1
+    const apiUrl = `https://api.screenshotmachine.com/?key=${screenshotApiKey}&url=${encodedUrl}&dimension=1024xfull&device=desktop&format=png&fullpage=1&hidecookiebanners=true&hidepopups=true`;
     
     console.log(`Calling ScreenshotMachine API for URL: ${url}`);
     
