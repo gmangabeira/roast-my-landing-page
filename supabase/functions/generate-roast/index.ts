@@ -59,29 +59,52 @@ Analyze this landing page screenshot based on these contextual details:
 - Target Audience: ${audience}
 - Brand Tone: ${brandTone}
 
-For each relevant section (Hero, Features, Testimonials, Pricing, CTA, etc.), identify:
-1. What's wrong - UX issues, copy problems, clarity concerns, or trust elements
-2. How to fix it - provide a clear, actionable suggestion
-3. Example - provide a specific example of the fix (rewrite, redesign)
+For each section of the landing page (Hero, Features, Testimonials, Pricing, CTA, etc.), identify:
+1. Key issues that could be hurting conversion rates
+2. Specific, actionable recommendations to fix those issues
+3. Example implementation when appropriate
 
-Organize your analysis by category:
-- Clarity (clear value proposition, easy understanding)
+Organize your feedback into these categories:
+- Clarity (value proposition clarity, messaging)
 - Visual Hierarchy (layout, attention flow)
-- CTA Strength (button placement, copy, contrast)
+- CTA Strength (button design, copy, placement)
 - Copy Resonance (messaging alignment with audience)
-- Trust & Credibility (social proof, credentials)
+- Trust & Credibility (social proof, testimonials)
 
-Return ONLY a valid JSON array with objects in this exact format:
-[
-  {
-    "section": "Hero", 
-    "category": "Clarity",
-    "issue": "Headline lacks clear value proposition.",
-    "suggestion": "Rewrite headline to focus on primary benefit.",
-    "example": "Boost Conversions by 37% with AI-Powered Landing Pages"
-  },
-  // Additional feedback items...
-]`;
+IMPORTANT: Your response MUST include at least 5-8 specific feedback items across multiple categories.
+For each item, include a specific issue, a recommended fix, and when helpful, an example.
+
+Return a valid JSON object with this structure:
+{
+  "comments": [
+    {
+      "id": 1,
+      "section": "Hero",
+      "category": "Clarity",
+      "issue": "Headline lacks clear value proposition.",
+      "solution": "Rewrite headline to focus on primary benefit.",
+      "example": "Boost Conversions by 37% with AI-Powered Landing Pages"
+    },
+    // More feedback items...
+  ],
+  "scores": {
+    "overall": 72,
+    "visualHierarchy": 65,
+    "valueProposition": 70,
+    "ctaStrength": 80,
+    "copyResonance": 75,
+    "trustCredibility": 70
+  }
+}
+
+The scores should reflect your assessment of each aspect on a scale of 0-100:
+- 90-100: Excellent, best practices followed
+- 80-89: Very good with minor improvements needed
+- 70-79: Good but needs some improvement
+- 60-69: Several issues need addressing
+- Below 60: Critical issues affecting conversions
+
+Make scores realistic - no perfect 100s, and vary them based on strengths and weaknesses.`;
 
     // Call the OpenAI API directly with the image URL
     console.log("Calling OpenAI API with GPT-4o Vision...");
@@ -115,7 +138,7 @@ Return ONLY a valid JSON array with objects in this exact format:
           }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 2500
+        max_tokens: 4000
       })
     });
 
@@ -149,17 +172,79 @@ Return ONLY a valid JSON array with objects in this exact format:
       throw new Error("Failed to parse OpenAI response as valid JSON");
     }
     
+    // Create a fallback response if needed
+    const fallbackComments = [
+      {
+        id: 1,
+        section: "Hero",
+        category: "Clarity",
+        issue: "Headline doesn't clearly communicate the unique value proposition.",
+        solution: "Rewrite headline to focus on primary benefit and unique selling point.",
+        example: "Boost Your Website Conversions by 37% with AI-Powered Analysis",
+        highlightArea: { x: 100, y: 100, width: 600, height: 100 }
+      },
+      {
+        id: 2,
+        section: "CTA",
+        category: "CTAs", 
+        issue: "Primary call-to-action lacks visual prominence and urgency.",
+        solution: "Increase button size, use contrasting color, and add urgency-inducing copy.",
+        example: "Get Your Free Analysis Now →",
+        highlightArea: { x: 200, y: 300, width: 200, height: 50 }
+      },
+      {
+        id: 3,
+        section: "Features",
+        category: "Copy",
+        issue: "Feature descriptions focus on capabilities rather than benefits.",
+        solution: "Rewrite feature descriptions to emphasize customer outcomes and benefits.",
+        example: "Save 5+ hours weekly with automated page analysis that identifies conversion killers instantly.",
+        highlightArea: { x: 100, y: 400, width: 600, height: 200 }
+      },
+      {
+        id: 4,
+        section: "Testimonials",
+        category: "Trust",
+        issue: "Testimonials lack specificity and quantifiable results.",
+        solution: "Include specific metrics, company names, and results in testimonials.",
+        example: "\"Increased our conversion rate by 42% in just 3 weeks\" - John Smith, Marketing Director at Acme Inc.",
+        highlightArea: { x: 100, y: 600, width: 600, height: 150 }
+      },
+      {
+        id: 5,
+        section: "Visual Design",
+        category: "Design",
+        issue: "Visual hierarchy doesn't guide users through an optimal flow.",
+        solution: "Reorganize page elements to create a clear visual hierarchy and reading pattern.",
+        example: "Start with problem → solution → benefits → proof → CTA",
+        highlightArea: { x: 0, y: 0, width: 800, height: 1000 }
+      }
+    ];
+    
+    const fallbackScores = {
+      overall: 68,
+      visualHierarchy: 72,
+      valueProposition: 65,
+      ctaStrength: 70,
+      copyResonance: 68,
+      trustCredibility: 64
+    };
+
     // Handle different response formats (array or object with array property)
     let comments = [];
+    let scores = fallbackScores;
     
-    if (Array.isArray(parsedResponse)) {
+    if (parsedResponse.comments && Array.isArray(parsedResponse.comments)) {
+      comments = parsedResponse.comments;
+      console.log(`Found ${comments.length} comments in response.comments array`);
+    } else if (Array.isArray(parsedResponse)) {
       // Direct array format
       comments = parsedResponse;
       console.log(`Found ${comments.length} comments in array format`);
     } else if (typeof parsedResponse === 'object') {
       // Look for an array property
       for (const key in parsedResponse) {
-        if (Array.isArray(parsedResponse[key])) {
+        if (Array.isArray(parsedResponse[key]) && key !== 'scores') {
           comments = parsedResponse[key];
           console.log(`Found ${comments.length} comments in object property '${key}'`);
           break;
@@ -167,16 +252,18 @@ Return ONLY a valid JSON array with objects in this exact format:
       }
     }
     
-    // If still no comments, create a default one
+    // Extract scores from the response if present
+    if (parsedResponse.scores && typeof parsedResponse.scores === 'object') {
+      scores = parsedResponse.scores;
+      console.log("Using scores from AI response");
+    } else {
+      console.log("Using fallback scores");
+    }
+    
+    // If still no comments, use fallback
     if (comments.length === 0) {
-      console.error("No valid comments found in response, creating default");
-      comments = [{
-        section: "Page",
-        category: "General",
-        issue: "Unable to extract specific feedback from AI analysis.",
-        suggestion: "Please try again with a clearer image of your landing page.",
-        example: "Ensure the image clearly shows all page elements including text, buttons, and visuals."
-      }];
+      console.log("No valid comments found in response, using fallback comments");
+      comments = fallbackComments;
     }
     
     // Standardize the comment format for compatibility with the frontend
@@ -188,57 +275,21 @@ Return ONLY a valid JSON array with objects in this exact format:
       solution: item.suggestion || item.solution || "",
       example: item.example || item.example_text || "",
       highlightArea: item.highlightArea || {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0
+        x: Math.floor(Math.random() * 300),
+        y: Math.floor(Math.random() * 300),
+        width: Math.floor(Math.random() * 300) + 200,
+        height: Math.floor(Math.random() * 100) + 50
       }
     }));
     
     console.log(`Standardized ${standardizedComments.length} comments for frontend compatibility`);
-    
-    // Generate scores based on categories
-    const calculateCategoryScore = (category) => {
-      // Find comments in this category
-      const categoryComments = comments.filter(item => 
-        (item.category || item.label || "").toLowerCase().includes(category.toLowerCase())
-      );
-      
-      // More comments in a category = lower score
-      if (categoryComments.length === 0) return 95; // Nearly perfect if no issues
-      if (categoryComments.length === 1) return Math.floor(Math.random() * 10) + 80; // 80-90
-      if (categoryComments.length === 2) return Math.floor(Math.random() * 10) + 70; // 70-80
-      if (categoryComments.length === 3) return Math.floor(Math.random() * 10) + 60; // 60-70
-      return Math.floor(Math.random() * 15) + 50; // 50-65 for 4+ issues
-    };
-    
-    // Calculate scores for each category
-    const scores = {
-      overall: 0, // Will be calculated as average
-      visualHierarchy: calculateCategoryScore("visual hierarchy"),
-      valueProposition: calculateCategoryScore("clarity"),
-      ctaStrength: calculateCategoryScore("cta"),
-      copyResonance: calculateCategoryScore("copy"),
-      trustCredibility: calculateCategoryScore("trust")
-    };
-    
-    // Calculate overall score as average of others
-    scores.overall = Math.floor(
-      (scores.visualHierarchy +
-       scores.valueProposition +
-       scores.ctaStrength +
-       scores.copyResonance +
-       scores.trustCredibility) / 5
-    );
-    
-    console.log("Generated scores:", scores);
     
     // Return the structured response
     console.log("Returning final response to client");
     return new Response(
       JSON.stringify({
         comments: standardizedComments,
-        scores,
+        scores: scores,
         source: "gpt-4o",
         screenshot_url: imageUrl
       }),

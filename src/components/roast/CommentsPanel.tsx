@@ -79,13 +79,6 @@ const CommentsPanel = ({ comments }: CommentsPanelProps) => {
                 </div>
                 
                 <div className="flex gap-3 mb-3 items-start">
-                  <MousePointer size={16} className="text-gray-400 mt-1" />
-                  <div className="text-xs text-gray-600">
-                    Highlighted area: {comment.highlightArea.width}×{comment.highlightArea.height} at position ({comment.highlightArea.x},{comment.highlightArea.y})
-                  </div>
-                </div>
-                
-                <div className="flex gap-3 mb-3 items-start">
                   <XCircle size={18} className="text-red-500 mt-0.5" />
                   <div className="flex-1">
                     <h4 className="font-medium mb-1 text-sm">What's wrong</h4>
