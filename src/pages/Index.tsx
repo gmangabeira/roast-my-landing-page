@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Flame } from 'lucide-react';
+import { Flame, Search, Eye, MessageSquare, Star } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -8,6 +8,9 @@ import UploadBox from '@/components/UploadBox';
 import ContextForm from '@/components/ContextForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import UrlInputForm from '@/components/UrlInputForm';
+import FeaturesGrid from '@/components/FeaturesGrid';
+import TestimonialsSection from '@/components/TestimonialsSection';
 
 const Index = () => {
   const { toast } = useToast();
@@ -34,6 +37,11 @@ const Index = () => {
   const handleUrlChange = (url: string) => {
     setEnteredUrl(url);
     console.log("URL entered:", url);
+  };
+
+  const handleUrlSubmit = (url: string) => {
+    setEnteredUrl(url);
+    console.log("URL submitted:", url);
   };
 
   const handleSubmit = async () => {
@@ -121,27 +129,78 @@ const Index = () => {
     }
   };
 
+  // Features data
+  const features = [
+    {
+      icon: <Eye size={24} className="text-brand-green" />,
+      title: "Predictive Heatmap",
+      description: "See where visitors look first and what they ignore on your landing page."
+    },
+    {
+      icon: <MessageSquare size={24} className="text-brand-green" />,
+      title: "Copy Critique",
+      description: "Get actionable feedback on messaging clarity and persuasiveness."
+    },
+    {
+      icon: <Star size={24} className="text-brand-green" />,
+      title: "Conversion Tips",
+      description: "Specific improvements to boost click-through and conversion rates."
+    }
+  ];
+
+  // Testimonials data
+  const testimonials = [
+    {
+      quote: "We increased our landing page conversion rate by 28% after implementing the AI recommendations.",
+      author: "Sarah Johnson",
+      company: "Growth Marketing, TechStart",
+      rating: 5
+    },
+    {
+      quote: "The heatmap analysis showed exactly where users were getting stuck. Game changer!",
+      author: "Michael Chen",
+      company: "Lead Designer, Convertify",
+      rating: 5
+    },
+    {
+      quote: "Finally, AI feedback that actually understands conversion principles. Worth every penny.",
+      author: "Alex Rodriguez",
+      company: "CMO, SaaS Solutions",
+      rating: 4
+    }
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-purple-50 to-white">
       <Header />
       
-      <main className="flex-1 container max-w-5xl mx-auto px-4 py-8 md:py-12">
-        <section className="text-center mb-10">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-3">
-            Roast Your Landing Page{' '}
-            <span className="inline-block animate-pulse-slow">🔥</span>
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Want to know where your landing page fails before users bounce? 
-            Get a CRO-grade roast powered by AI.
-          </p>
-        </section>
-        
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-6 md:p-8">
-              <h2 className="text-xl font-semibold mb-4">Upload Your Landing Page</h2>
+      {/* Hero Section with Gradient */}
+      <main className="flex-1">
+        <section className="relative pt-20 pb-32 px-4 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-100 to-pink-100 opacity-70"></div>
+          
+          <div className="container max-w-6xl mx-auto relative z-10">
+            <div className="text-center mb-12">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 bg-gradient-to-r from-brand-green to-emerald-600 bg-clip-text text-transparent">
+                Convert More Visitors with AI
+              </h1>
+              <p className="text-xl md:text-2xl text-gray-700 max-w-3xl mx-auto mb-8">
+                Get an instant, data-driven roast of your landing page and see what's stopping visitors from converting.
+              </p>
               
+              {/* URL Input Form */}
+              <UrlInputForm 
+                onUrlSubmit={handleUrlSubmit} 
+                isLoading={isLoading} 
+              />
+              
+              <p className="mt-4 text-sm text-gray-500">
+                Or upload a screenshot below if you prefer
+              </p>
+            </div>
+            
+            <div className="max-w-2xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-8 mt-8">
+              {/* Keep Upload Box for those who want to upload directly */}
               <UploadBox 
                 onFileChange={handleFileChange} 
                 onImageUploaded={handleImageUploaded}
@@ -186,48 +245,45 @@ const Index = () => {
               </p>
             </div>
           </div>
-          
-          <div className="mt-10 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-lg shadow-sm border">
-                <div className="bg-brand-green/10 w-10 h-10 rounded-full flex items-center justify-center mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-1">Predictive Heatmap</h3>
-                <p className="text-sm text-gray-600">See where visitors look first and what they ignore</p>
-              </div>
-              
-              <div className="bg-white p-5 rounded-lg shadow-sm border">
-                <div className="bg-brand-green/10 w-10 h-10 rounded-full flex items-center justify-center mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
-                    <path d="M10 2c1 .5 2 2 2 5" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-1">Copy Critique</h3>
-                <p className="text-sm text-gray-600">Get actionable feedback on messaging clarity and persuasiveness</p>
-              </div>
-              
-              <div className="bg-white p-5 rounded-lg shadow-sm border">
-                <div className="bg-brand-green/10 w-10 h-10 rounded-full flex items-center justify-center mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 10v12" />
-                    <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-1">Conversion Tips</h3>
-                <p className="text-sm text-gray-600">Specific improvements to boost click-through and conversion rates</p>
-              </div>
+        </section>
+        
+        {/* Features Section */}
+        <section className="py-16 px-4 bg-white">
+          <div className="container max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold mb-3">AI-Powered Conversion Insights</h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Our AI analyzes your landing page from a visitor's perspective and provides actionable recommendations
+              </p>
             </div>
+            
+            <FeaturesGrid features={features} />
           </div>
-        </div>
+        </section>
+        
+        {/* Testimonials Section */}
+        <TestimonialsSection testimonials={testimonials} />
+        
+        {/* CTA Section */}
+        <section className="py-16 px-4 bg-gradient-to-r from-brand-green/10 to-emerald-100/30">
+          <div className="container max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-6">Ready to Boost Your Conversion Rate?</h2>
+            <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto">
+              Don't let visitors bounce without converting. Get your landing page roasted by our AI today.
+            </p>
+            <Button 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              size="lg"
+              className="bg-brand-green hover:bg-brand-green/90 text-white px-8 py-6 text-lg shadow-md hover:shadow-lg transition-all"
+            >
+              Analyze My Landing Page
+            </Button>
+          </div>
+        </section>
       </main>
       
-      <footer className="py-6 border-t">
-        <div className="container max-w-5xl mx-auto px-4 text-center text-sm text-gray-500">
+      <footer className="py-8 border-t">
+        <div className="container max-w-6xl mx-auto px-4 text-center text-sm text-gray-500">
           <p>© 2025 Conversion ROAST. All rights reserved.</p>
         </div>
       </footer>

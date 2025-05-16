@@ -108,4 +108,16 @@
   .drop-shadow-brand {
     filter: drop-shadow(0 4px 12px rgba(34, 197, 94, 0.15));
   }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-green to-emerald-600 bg-clip-text text-transparent;
+  }
+  
+  .hero-gradient {
+    @apply bg-gradient-to-r from-purple-100 to-pink-100;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
 }
