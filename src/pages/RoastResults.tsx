@@ -398,57 +398,60 @@ const RoastResults = () => {
           </div>
         </div>
         
-        {/* Screenshot Section */}
-        <Card className="mb-10 overflow-hidden">
-          <CardContent className="p-0">
-            {roastData?.screenshot_url && (
-              <img 
-                src={roastData.screenshot_url}
-                alt="Website screenshot" 
-                className="w-full h-auto object-contain border-b"
+        {/* Two-column layout for screenshot and reports */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+          {/* Screenshot Column */}
+          <div className="lg:col-span-1">
+            <ScreenshotPanel 
+              screenshot={roastData.screenshot_url} 
+              heatmapData={[]} 
+              showHeatmap={showHeatmap}
+              setShowHeatmap={setShowHeatmap}
+            />
+          </div>
+          
+          {/* Reports Column */}
+          <div className="lg:col-span-2">
+            {/* Conversion Report Section */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span className="text-brand-green bg-brand-green/10 p-1.5 rounded-full">📊</span>
+                Conversion Report
+              </h2>
+              
+              <ReportSection
+                title="Design & User Experience"
+                icon={<Layout size={24} className="text-gray-700" />}
+                score={78}
+                description="Your design is modern and clean, but there are some contrast issues that could affect readability."
+                checklistItems={designChecklist}
               />
-            )}
-          </CardContent>
-        </Card>
-        
-        {/* Conversion Report Section */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <span className="text-brand-green bg-brand-green/10 p-1.5 rounded-full">📊</span>
-            Conversion Report
-          </h2>
-          
-          <ReportSection
-            title="Design & User Experience"
-            icon={<Layout size={24} className="text-gray-700" />}
-            score={78}
-            description="Your design is modern and clean, but there are some contrast issues that could affect readability."
-            checklistItems={designChecklist}
-          />
-          
-          <ReportSection
-            title="Navigation"
-            icon={<Navigation size={24} className="text-gray-700" />}
-            score={65}
-            description="Overall navigation is intuitive, but lacks some key elements that would improve user experience."
-            checklistItems={navigationChecklist}
-          />
-          
-          <ReportSection
-            title="Branding"
-            icon={<Palette size={24} className="text-gray-700" />}
-            score={82}
-            description="Your brand identity is consistent across the site, but your value proposition could be stronger."
-            checklistItems={brandingChecklist}
-          />
-          
-          <ReportSection
-            title="Copywriting"
-            icon={<Type size={24} className="text-gray-700" />}
-            score={70}
-            description="Your copy is clear but could be more persuasive with a stronger focus on benefits."
-            checklistItems={copyChecklist}
-          />
+              
+              <ReportSection
+                title="Navigation"
+                icon={<Navigation size={24} className="text-gray-700" />}
+                score={65}
+                description="Overall navigation is intuitive, but lacks some key elements that would improve user experience."
+                checklistItems={navigationChecklist}
+              />
+              
+              <ReportSection
+                title="Branding"
+                icon={<Palette size={24} className="text-gray-700" />}
+                score={82}
+                description="Your brand identity is consistent across the site, but your value proposition could be stronger."
+                checklistItems={brandingChecklist}
+              />
+              
+              <ReportSection
+                title="Copywriting"
+                icon={<Type size={24} className="text-gray-700" />}
+                score={70}
+                description="Your copy is clear but could be more persuasive with a stronger focus on benefits."
+                checklistItems={copyChecklist}
+              />
+            </div>
+          </div>
         </div>
         
         {/* Traffic Report Section */}
